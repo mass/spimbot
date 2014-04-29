@@ -69,6 +69,7 @@ SYS_PRINT_CHAR     = 11
 
 # Sudoku board memory
 sudoku:            .space 512
+flags:             .space NUM_FLAGS * 2 * 4
 
 #############
 # Main Loop #
@@ -89,16 +90,29 @@ main:
   add    $t0, $t0, 10
   sw     $t0, TIMER                    # REQUEST_TIMER(TIMER() + 10)
 
+  jal    load_sudoku
+
 infinite:
-  la     $t0, sudoku
-  sw     $t0, SUDOKU_REQUEST           # Request new soduku puzzle
+  # Find next target
+  # Aim towards target
+  # Move towards target while solving
+  # Pick up flag
+  # Repeat
 
-  jal    sudoku_solve                  # Solve sudoku puzzle (rule2 will fail)
+  la     $t0, flags
+  sw     $t0, FLAG_REQUEST             # FLAG_REQUEST(&flags)
 
-  la     $t0, sudoku
-  sw     $t0, SUDOKU_SOLVED            # Report solved puzzle
+
+
+  #la     $t0, sudoku
+  #sw     $t0, SUDOKU_SOLVED            # Report solved puzzle
 
   j      infinite                      # Infinite loop
+
+load_sudoku:
+  la     $t0, sudoku
+  sw     $t0, SUDOKU_REQUEST           # Request new soduku puzzle
+  jr     $ra
 
 #####################
 # Interrupt Handler #
@@ -158,12 +172,23 @@ interrupt_timer:
   sw     $0, TIMER_ACKNOWLEDGE         # Acknowledge timer interrupt
 
   lw     $v0, TIMER
-  sw     $v0, PRINT_INT                # PRINT_INT(TIMER())
+  #sw     $v0, PRINT_INT                # PRINT_INT(TIMER())
+
+  li     $a0, 1000
+  div    $a0, $v0, $a0
+  mfhi   $a0
+  sw     $a0, PRINT_INT                # PRINT_INT(TIMER() % 1000)
 
   sw     $0, GENERATE_FLAG             # Creates a new flag
+  la     $v0, flags
+  sw     $v0, FLAG_REQUEST             # FLAG_REQUEST(&flags)
+
+  #move   $a0, $t0
+  #jal    sudoku_r1                     # Run rule1 algorithm
+  #bne    $v0, 0, sudoku_solve          # Repeat rule1 if changes were made
 
   lw     $v0, TIMER
-  add    $v0, $v0, 800000
+  add    $v0, $v0, 800
   sw     $v0, TIMER                    # REQUEST_TIMER(TIMER() + 2000)
 
   j      interrupt_dispatch            # Handle further interrupts
@@ -188,18 +213,6 @@ id_done:
 #################
 
 .text
-
-sudoku_solve:
-  sub    $sp, $sp, 4                   # Allocate stack memory
-  sw     $ra, 0($sp)                   # Save $ra
-
-  la     $a0, sudoku
-  jal    sudoku_r1                     # Run rule1 algorithm
-
-  bne    $v0, 0, sudoku_solve          # Repeat rule1 if changes were made
-  lw     $ra, 0($sp)                   # Restore $ra
-  add    $sp, $sp, 4                   # Deallocate stack memory
-  jr     $ra                           # Return
 
 sudoku_r1:
   sub    $sp, $sp, 32                  # Allocate stack memory
