@@ -2,7 +2,7 @@
 # File: spimbot.s       #
 #                       #
 # Author: Andrew Mass   #
-# Date:   2014-04-29    #
+# Date:   2014-04-30    #
 #                       #
 # "The distance between #
 # insanity and genius   #
@@ -23,6 +23,8 @@ BASE_RADIUS        = 24                # Base radius
 MAX_FLAGS          = 5                 # Maximum flags in hand
 FLAG_COST          = 7                 # Energy cost to generate a flag
 INVIS_COST         = 25                # Energy cost to go invisible
+BE_T               = 150 - BASE_RADIUS # Top edge of the base
+BE_B               = 150 + BASE_RADIUS # Bottom edge of the base
 
 # Memory-mapped I/O
 VELOCITY           = 0xffff0010
@@ -68,8 +70,7 @@ SYS_PRINT_STRING   = 4
 SYS_PRINT_CHAR     = 11
 
 # Frequency constants
-GENFLAG_FREQ       = 1500000
-TIMER_FREQ         = 10000
+TIMER_FREQ         = 2000
 
 # Float constants
 three:             .float 3.0
@@ -78,7 +79,6 @@ pi:                .float 3.14159265
 f180:              .float 180.0
 
 # Data member storage
-timer_counter:     .word 0
 target_x:          .word 0
 target_y:          .word 0
 
@@ -105,55 +105,29 @@ main:
   add    $t0, $t0, TIMER_FREQ
   sw     $t0, TIMER                    # REQUEST_TIMER(TIMER() + 10)
 
-  jal    load_sudoku
-
-  la     $t0, flags
-  sw     $t0, FLAG_REQUEST             # FLAG_REQUEST(&flags)
-
-  lw     $t0, flags($0)
-  sw     $t0, target_x
-  lw     $t1, flags+4($0)
-  sw     $t1, target_y
-
-infinite:
-  lw     $t0, target_x
-  lw     $t1, BOT_X
-  sub    $t2, $t0, $t1
-  abs    $t2, $t2                      # abs(target_x - BOT_X)
-  bge    $t2, 2, skip_pick
-
-  lw     $t0, target_y
-  lw     $t1, BOT_Y
-  sub    $t3, $t0, $t1
-  abs    $t3, $t3                      # abs(target_y - BOT_Y)
-  bge    $t3, 2, skip_pick
-
-  sw     $0, PICK_FLAG
-
-  la     $t0, flags
-  sw     $t0, FLAG_REQUEST             # FLAG_REQUEST(&flags)
-
-  lw     $t0, flags($0)
-  sw     $t0, target_x
-  lw     $t1, flags+4($0)
-  sw     $t1, target_y
-
-skip_pick:
-  la     $a0, sudoku
-  jal    sudoku_r1                     # Run rule1 algorithm
-  bne    $v0, 0, infinite              # Repeat rule1 if changes were made
-
-  la     $t0, sudoku
-  sw     $t0, SUDOKU_SOLVED
-
-  jal    load_sudoku
-
-  j      infinite                      # Infinite loop
-
-load_sudoku:
   la     $t0, sudoku
   sw     $t0, SUDOKU_REQUEST           # Request new soduku puzzle
-  jr     $ra
+
+  la     $t0, flags
+  sw     $t0, FLAG_REQUEST             # FLAG_REQUEST(&flags)
+
+  lw     $t0, flags($0)
+  sw     $t0, target_x
+  lw     $t1, flags+4($0)
+  sw     $t1, target_y                 # target = flags[0]
+
+infinite:
+  la     $a0, sudoku
+  jal    sudoku_r1                     # Run rule1 algorithm
+  bnez   $v0, infinite                 # Repeat rule1 if changes were made
+
+  la     $t0, sudoku
+  sw     $t0, SUDOKU_SOLVED            # Report solved sudoku
+
+  la     $t0, sudoku
+  sw     $t0, SUDOKU_REQUEST           # Request new soduku puzzle
+
+  j      infinite                      # Jump to top of loop
 
 #####################
 # Interrupt Handler #
@@ -161,7 +135,7 @@ load_sudoku:
 
 .kdata
 
-chunkIH:           .space    24
+chunkIH:           .space    12
 non_intrpt_str:    .asciiz   "Non-interrupt exception\n"
 unhandled_str:     .asciiz   "Unhandled interrupt type\n"
 
@@ -172,23 +146,24 @@ interrupt_handler:
   move   $k1, $at                      # Save $at
 .set at
   la     $k0, chunkIH
-  sw     $a0, 0($k0)                   # Save $a0
-  sw     $v0, 4($k0)                   # Save $v0
+  sw     $a0, 0($k0)                  # Save $a0
+  sw     $a1, 4($k0)                  # Save $a1
+  sw     $v0, 8($k0)                  # Save $v0
 
   mfc0   $k0, $13                      # Get interrupt cause register
   srl    $a0, $k0, 2
   and    $a0, $a0, 0xf                 # Mask with ExcCode field
-  bne    $a0, 0, non_interrupt         # Non-interrupt
+  bnez   $a0, non_interrupt            # Non-interrupt
 
 interrupt_dispatch:
   mfc0   $k0, $13                      # Get interrupt cause register
-  beq    $k0, 0, id_done               # Handled all interrupts
+  beqz   $k0, id_done                  # Handled all interrupts
 
   and    $a0, $k0, BONK_MASK
-  bne    $a0, 0, interrupt_bonk        # Handle bonk interrupt
+  bnez   $a0, interrupt_bonk           # Handle bonk interrupt
 
   and    $a0, $k0, TIMER_MASK
-  bne    $a0, 0, interrupt_timer       # Handle timer interrupt
+  bnez   $a0, interrupt_timer          # Handle timer interrupt
 
   li     $v0, SYS_PRINT_STRING
   la     $a0, unhandled_str
@@ -201,7 +176,7 @@ interrupt_bonk:
 
   li     $v0, 135
   sw     $v0, ANGLE
-  sw     $0, ANGLE_CONTROL             # Turn pi radians
+  sw     $0, ANGLE_CONTROL             # Turn 135 degrees
 
   li     $v0, 10
   sw     $v0, VELOCITY                 # SET_VELOCITY(10)
@@ -211,46 +186,34 @@ interrupt_bonk:
 interrupt_timer:
   sw     $0, TIMER_ACKNOWLEDGE         # Acknowledge timer interrupt
 
-  lw     $a0, timer_counter
-  add    $a0, $a0, 1
-  sw     $a0, timer_counter            # timer_counter++
-
-  li     $v0, GENFLAG_FREQ
-  div    $v0, $a0, $v0
-  mfhi   $v0
-  bgt    $v0, $0, it_skip_genflag      # if(timer_counter % GENFLAG_FREQ) > 0)
-
-  sw     $0, GENERATE_FLAG             # Creates a new flag
-  la     $v0, flags
-  sw     $v0, FLAG_REQUEST             # FLAG_REQUEST(&flags)
-
-it_skip_genflag:
-  lw     $a0, target_x
-  lw     $a1, BOT_X
-  sub    $v0, $a0, $a1
-  abs    $v0, $v0                      # abs(target_x - BOT_X)
-  bge    $v0, 2, it_skip_pick
-
-  lw     $a0, target_y
-  lw     $a1, BOT_Y
-  sub    $v0, $a0, $a1
-  abs    $v0, $v0                      # abs(target_y - BOT_Y)
-  bge    $v0, 2, it_skip_pick
-
+  lw     $a0, FLAGS_IN_HAND
   sw     $0, PICK_FLAG
+  lw     $a1, FLAGS_IN_HAND
+  ble    $a1, $a0, it_skip_target
 
   la     $a0, flags
-  sw     $a0, FLAG_REQUEST             # FLAG_REQUEST(&flags)
-
+  sw     $a0, FLAG_REQUEST
   lw     $a0, flags($0)
   sw     $a0, target_x
   lw     $a1, flags+4($0)
   sw     $a1, target_y
 
-it_skip_pick:
-  lw     $v0, TIMER
-  add    $v0, $v0, TIMER_FREQ
-  sw     $v0, TIMER                    # REQUEST_TIMER(TIMER() + TIMER_FREQ)
+it_skip_target:
+  lw     $a0, BOT_X
+  bge    $a0, BASE_RADIUS, it_skip_base # Skip if right of base
+
+  lw     $a0, BOT_Y
+  bge    $a0, BE_B, it_skip_base       # Skip if below base
+  ble    $a0, BE_T, it_skip_base       # Skip if above base
+
+  li     $a0, 180
+  sw     $a0, ANGLE
+  sw     $0, ANGLE_CONTROL             # Turn around
+
+it_skip_base:
+  lw     $a0, TIMER
+  add    $a0, $a0, TIMER_FREQ
+  sw     $a0, TIMER                    # REQUEST_TIMER(TIMER() + TIMER_FREQ)
 
   j      interrupt_dispatch            # Handle further interrupts
 
@@ -262,7 +225,8 @@ non_interrupt:
 id_done:
   la     $k0, chunkIH
   lw     $a0, 0($k0)                   # Restore $a0
-  lw     $v0, 4($k0)                   # Restore $v0
+  lw     $a1, 4($k0)                   # Restore $a1
+  lw     $v0, 8($k0)                   # Restore $v0
 .set noat
   move   $at, $k1                      # Restore $at
 .set at
@@ -271,8 +235,6 @@ id_done:
 ####################
 # Helper Functions #
 ####################
-
-.text
 
 ### int euclidean_dist(int x, int y);
 ### Returns sqrt(x^2 + y^2)
@@ -325,9 +287,9 @@ pos_x:
   div.s  $f5, $f4, $f5                 # v^^5/5
   add.s  $f6, $f6, $f5                 # value = v - v^^3/3 + v^^5/5
 
-  l.s    $f8, PI                       # load PI
+  l.s    $f8, pi                       # load PI
   div.s  $f6, $f6, $f8                 # value / PI
-  l.s    $f7, F180                     # load 180.0
+  l.s    $f7, f180                     # load 180.0
   mul.s  $f6, $f6, $f7                 # 180.0 * value / PI
 
   cvt.w.s $f6, $f6                     # convert "delta" back to integer
@@ -339,6 +301,8 @@ pos_x:
 #################
 # Sudoku Solver #
 #################
+
+.text
 
 sudoku_r1:
   sub    $sp, $sp, 32                  # Allocate stack memory
