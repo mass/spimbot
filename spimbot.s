@@ -2,7 +2,7 @@
 # File: spimbot.s       #
 #                       #
 # Author: Andrew Mass   #
-# Date:   2014-04-27    #
+# Date:   2014-04-29    #
 #                       #
 # "The distance between #
 # insanity and genius   #
@@ -67,6 +67,21 @@ SYS_PRINT_INT      = 1
 SYS_PRINT_STRING   = 4
 SYS_PRINT_CHAR     = 11
 
+# Frequency constants
+GENFLAG_FREQ       = 1500000
+TIMER_FREQ         = 10000
+
+# Float constants
+three:             .float 3.0
+five:              .float 5.0
+pi:                .float 3.14159265
+f180:              .float 180.0
+
+# Data member storage
+timer_counter:     .word 0
+target_x:          .word 0
+target_y:          .word 0
+
 # Sudoku board memory
 sudoku:            .space 512
 flags:             .space NUM_FLAGS * 2 * 4
@@ -87,25 +102,51 @@ main:
   sw     $t0, VELOCITY                 # SET_VELCOITY(10)
 
   lw     $t0, TIMER
-  add    $t0, $t0, 10
+  add    $t0, $t0, TIMER_FREQ
   sw     $t0, TIMER                    # REQUEST_TIMER(TIMER() + 10)
 
   jal    load_sudoku
 
+  la     $t0, flags
+  sw     $t0, FLAG_REQUEST             # FLAG_REQUEST(&flags)
+
+  lw     $t0, flags($0)
+  sw     $t0, target_x
+  lw     $t1, flags+4($0)
+  sw     $t1, target_y
+
 infinite:
-  # Find next target
-  # Aim towards target
-  # Move towards target while solving
-  # Pick up flag
-  # Repeat
+  lw     $t0, target_x
+  lw     $t1, BOT_X
+  sub    $t2, $t0, $t1
+  abs    $t2, $t2                      # abs(target_x - BOT_X)
+  bge    $t2, 2, skip_pick
+
+  lw     $t0, target_y
+  lw     $t1, BOT_Y
+  sub    $t3, $t0, $t1
+  abs    $t3, $t3                      # abs(target_y - BOT_Y)
+  bge    $t3, 2, skip_pick
+
+  sw     $0, PICK_FLAG
 
   la     $t0, flags
   sw     $t0, FLAG_REQUEST             # FLAG_REQUEST(&flags)
 
+  lw     $t0, flags($0)
+  sw     $t0, target_x
+  lw     $t1, flags+4($0)
+  sw     $t1, target_y
 
+skip_pick:
+  la     $a0, sudoku
+  jal    sudoku_r1                     # Run rule1 algorithm
+  bne    $v0, 0, infinite              # Repeat rule1 if changes were made
 
-  #la     $t0, sudoku
-  #sw     $t0, SUDOKU_SOLVED            # Report solved puzzle
+  la     $t0, sudoku
+  sw     $t0, SUDOKU_SOLVED
+
+  jal    load_sudoku
 
   j      infinite                      # Infinite loop
 
@@ -120,7 +161,7 @@ load_sudoku:
 
 .kdata
 
-chunkIH:           .space    12
+chunkIH:           .space    24
 non_intrpt_str:    .asciiz   "Non-interrupt exception\n"
 unhandled_str:     .asciiz   "Unhandled interrupt type\n"
 
@@ -132,8 +173,7 @@ interrupt_handler:
 .set at
   la     $k0, chunkIH
   sw     $a0, 0($k0)                   # Save $a0
-  sw     $a1, 4($k0)                   # Save $a1
-  sw     $v0, 8($k0)                   # Save $v0
+  sw     $v0, 4($k0)                   # Save $v0
 
   mfc0   $k0, $13                      # Get interrupt cause register
   srl    $a0, $k0, 2
@@ -171,25 +211,46 @@ interrupt_bonk:
 interrupt_timer:
   sw     $0, TIMER_ACKNOWLEDGE         # Acknowledge timer interrupt
 
-  lw     $v0, TIMER
-  #sw     $v0, PRINT_INT                # PRINT_INT(TIMER())
+  lw     $a0, timer_counter
+  add    $a0, $a0, 1
+  sw     $a0, timer_counter            # timer_counter++
 
-  li     $a0, 1000
-  div    $a0, $v0, $a0
-  mfhi   $a0
-  sw     $a0, PRINT_INT                # PRINT_INT(TIMER() % 1000)
+  li     $v0, GENFLAG_FREQ
+  div    $v0, $a0, $v0
+  mfhi   $v0
+  bgt    $v0, $0, it_skip_genflag      # if(timer_counter % GENFLAG_FREQ) > 0)
 
   sw     $0, GENERATE_FLAG             # Creates a new flag
   la     $v0, flags
   sw     $v0, FLAG_REQUEST             # FLAG_REQUEST(&flags)
 
-  #move   $a0, $t0
-  #jal    sudoku_r1                     # Run rule1 algorithm
-  #bne    $v0, 0, sudoku_solve          # Repeat rule1 if changes were made
+it_skip_genflag:
+  lw     $a0, target_x
+  lw     $a1, BOT_X
+  sub    $v0, $a0, $a1
+  abs    $v0, $v0                      # abs(target_x - BOT_X)
+  bge    $v0, 2, it_skip_pick
 
+  lw     $a0, target_y
+  lw     $a1, BOT_Y
+  sub    $v0, $a0, $a1
+  abs    $v0, $v0                      # abs(target_y - BOT_Y)
+  bge    $v0, 2, it_skip_pick
+
+  sw     $0, PICK_FLAG
+
+  la     $a0, flags
+  sw     $a0, FLAG_REQUEST             # FLAG_REQUEST(&flags)
+
+  lw     $a0, flags($0)
+  sw     $a0, target_x
+  lw     $a1, flags+4($0)
+  sw     $a1, target_y
+
+it_skip_pick:
   lw     $v0, TIMER
-  add    $v0, $v0, 800
-  sw     $v0, TIMER                    # REQUEST_TIMER(TIMER() + 2000)
+  add    $v0, $v0, TIMER_FREQ
+  sw     $v0, TIMER                    # REQUEST_TIMER(TIMER() + TIMER_FREQ)
 
   j      interrupt_dispatch            # Handle further interrupts
 
@@ -201,18 +262,83 @@ non_interrupt:
 id_done:
   la     $k0, chunkIH
   lw     $a0, 0($k0)                   # Restore $a0
-  lw     $a1, 4($k0)                   # Restore $a1
-  lw     $v0, 8($k0)                   # Restore $v0
+  lw     $v0, 4($k0)                   # Restore $v0
 .set noat
   move   $at, $k1                      # Restore $at
 .set at
   eret                                 # Return
 
+####################
+# Helper Functions #
+####################
+
+.text
+
+### int euclidean_dist(int x, int y);
+### Returns sqrt(x^2 + y^2)
+euclidean_dist:
+  mul    $a0, $a0, $a0                 # x^2
+  mul    $a1, $a1, $a1                 # y^2
+  add    $v0, $a0, $a1                 # x^2 + y^2
+  mtc1   $v0, $f0
+  cvt.s.w $f0, $f0                     # float(x^2 + y^2)
+  sqrt.s $f0, $f0                      # sqrt(x^2 + y^2)
+  cvt.w.s $f0, $f0                     # int(sqrt(...))
+  mfc1   $v0, $f0
+  jr     $ra
+
+### int arctan(int x, int y);
+### Returns arctan(y / x)
+sb_arctan:
+  li     $v0, 0                        # angle = 0;
+
+  abs    $t0, $a0                      # get absolute values
+  abs    $t1, $a1
+  ble    $t1, $t0, no_TURN_90          # Branch if(abs(y) < abs(x))
+
+  move   $t0, $a1                      # int temp = y;
+  neg    $a1, $a0                      # y = -x;
+  move   $a0, $t0                      # x = temp;
+  li     $v0, 90                       # angle = 90;
+
+no_TURN_90:
+  bgez   $a0, pos_x                    # skip if (x >= 0)
+
+  add    $v0, $v0, 180                 # angle += 180;
+
+pos_x:
+  mtc1   $a0, $f0
+  mtc1   $a1, $f1
+  cvt.s.w $f0, $f0                     # convert from ints to floats
+  cvt.s.w $f1, $f1
+
+  div.s  $f0, $f1, $f0                 # float v = (float) y / (float) x;
+
+  mul.s  $f1, $f0, $f0                 # v^^2
+  mul.s  $f2, $f1, $f0                 # v^^3
+  l.s    $f3, three                    # load 5.0
+  div.s  $f3, $f2, $f3                 # v^^3/3
+  sub.s  $f6, $f0, $f3                 # v - v^^3/3
+
+  mul.s  $f4, $f1, $f2                 # v^^5
+  l.s    $f5, five                     # load 3.0
+  div.s  $f5, $f4, $f5                 # v^^5/5
+  add.s  $f6, $f6, $f5                 # value = v - v^^3/3 + v^^5/5
+
+  l.s    $f8, PI                       # load PI
+  div.s  $f6, $f6, $f8                 # value / PI
+  l.s    $f7, F180                     # load 180.0
+  mul.s  $f6, $f6, $f7                 # 180.0 * value / PI
+
+  cvt.w.s $f6, $f6                     # convert "delta" back to integer
+  mfc1   $t0, $f6
+  add    $v0, $v0, $t0                 # angle += delta
+
+  jr     $ra
+
 #################
 # Sudoku Solver #
 #################
-
-.text
 
 sudoku_r1:
   sub    $sp, $sp, 32                  # Allocate stack memory
