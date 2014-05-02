@@ -2,7 +2,7 @@
 # File: spimbot.s       #
 #                       #
 # Author: Andrew Mass   #
-# Date:   2014-04-30    #
+# Date:   2014-05-02    #
 #                       #
 # "The distance between #
 # insanity and genius   #
@@ -305,117 +305,119 @@ pos_x:
 .text
 
 sudoku_r1:
-  sub    $sp, $sp, 32                  # Allocate stack memory
+  sub    $sp, $sp, 24                  # Allocate stack memory
   sw     $s0, 0($sp)                   # Save $s0
   sw     $s1, 4($sp)                   # Save $s1
   sw     $s2, 8($sp)                   # Save $s2
   sw     $s3, 12($sp)                  # Save $s3
   sw     $s4, 16($sp)                  # Save $s4
-  sw     $s5, 20($sp)                  # Save $s5
-  sw     $s6, 24($sp)                  # Save $s6
-  sw     $ra, 28($sp)                  # Save $ra
-  li     $s0, 0                        # bool changed = false
-  li     $s1, 0                        # int i = 0
+  sw     $ra, 20($sp)                  # Save $ra
+  add    $s0, $0, $0                   # bool changed = false
+  add    $s1, $0, $0                   # int i = 0
   move   $s3, $a0                      # &board
 
 s_r1_oloop:
-  bge    $s1, 16, s_r1_oloop_e         # Exit outer loop if(i >= 4 * 4)
-  li     $s2, 0                        # int j = 0
+  bge    $s1, 16, s_r1_oloop_e         # Exit outer loop if(i >= 16)
+  and    $s2, $0, $0                   # int j = 0
 
 s_r1_iloop:
-  bge    $s2, 16, s_r1_iloop_e         # Exit inner loop if(j >= 4 * 4)
-  mul    $t0, $s1, 16
+  bge    $s2, 16, s_r1_iloop_e         # Exit inner loop if(j >= 16)
+
+  sll    $t0, $s1, 4
   add    $t0, $t0, $s2
-  mul    $t0, $t0, 2
+  sll    $t0, $t0, 1
   add    $t0, $t0, $s3                 # &board[i][j]
+
   lhu    $s4, 0($t0)                   # unsigned value = board[i][j]
   move   $a0, $s4
   jal    s_has_single_bit_set
-  beq    $v0, 0, s_r1_bit_set_skip     # Branch if(!has_single_bit_set(value))
-  li     $t0, 0                        # int k = 0
+  beqz   $v0, s_r1_bit_set_skip        # Branch if(!has_single_bit_set(value))
+
+  add    $t0, $0, 15                   # int k = GRID_SQUARED - 1
+
+  sll    $t1, $s1, 4
+  add    $t1, $t1, $t0
+  sll    $t1, $t1, 1
+  add    $t1, $t1, $s3                 # &board[i][k]
+
+  sll    $t2, $t0, 4
+  add    $t2, $t2, $s2
+  sll    $t2, $t2, 1
+  add    $t2, $t2, $s3                 # &board[k][j]
 
 s_r1_i1loop:
-  bge    $t0, 16, s_r1_i1loop_e        # Exit inner k loop if(k >= 4 * 4)
+  bltz   $t0, s_r1_i1loop_e            # Exit inner k loop if(k < 0)
   beq    $t0, $s2, s_r1_i11_skip       # Skip if(k == j)
-  mul    $t1, $s1, 16
-  add    $t1, $t1, $t0
-  mul    $t1, $t1, 2
-  add    $t1, $t1, $s3                 # &board[i][k]
-  lhu    $t2, 0($t1)                   # board[i][k]
-  and    $t2, $t2, $s4                 # board[i][k] & value
-  beq    $t2, $0, s_r1_i11_skip        # Skip if((board[i][k] & value) == 0)
-  lhu    $t2, 0($t1)                   # board[i][k]
-  li     $t3, -1
-  xor    $t3, $t3, $s4
-  and    $t2, $t2, $t3                 # board[i][k] & ~value
-  sh     $t2, 0($t1)                   # board[i][k] &= ~value
-  li     $s0, 1                        # changed = true
+  lhu    $t3, 0($t1)                   # board[i][k]
+  and    $t4, $t3, $s4                 # board[i][k] & value
+  beqz   $t4, s_r1_i11_skip            # Skip if((board[i][k] & value) == 0)
+  sub    $t4, $0, 1
+  xor    $t4, $t4, $s4
+  and    $t4, $t3, $t4
+  sh     $t4, 0($t1)                   # board[i][k] &= ~value
+  add    $s0, $0, 1                    # changed = true
 
 s_r1_i11_skip:
   beq    $t0, $s1, s_r1_i12_skip       # Skip if(k == i)
-  mul    $t1, $t0, 16
-  add    $t1, $t1, $s2
-  mul    $t1, $t1, 2
-  add    $t1, $t1, $s3                 # &board[k][j]
-  lhu    $t2, 0($t1)                   # board[k][j]
-  and    $t2, $t2, $s4                 # board[k][j] & value
-  beq    $t2, $0, s_r1_i12_skip        # Skip if((board[k][j] & value) == 0)
-  lhu    $t2, 0($t1)                   # board[k][j]
-  li     $t3, -1
-  xor    $t3, $t3, $s4
-  and    $t2, $t2, $t3                 # board[k][j] & ~value
-  sh     $t2, 0($t1)                   # board[k][j] &= ~value
-  li     $s0, 1                        # changed = true
+  lhu    $t3, 0($t2)                   # board[k][j]
+  and    $t4, $t3, $s4                 # board[k][j] & value
+  beqz   $t4, s_r1_i12_skip            # Skip if((board[k][j] & value) == 0)
+  sub    $t4, $0, 1
+  xor    $t4, $t4, $s4
+  and    $t4, $t3, $t4
+  sh     $t4, 0($t2)                   # board[k][j] &= ~value
+  add    $s0, $0, 1                    # changed = true
 
 s_r1_i12_skip:
-  add    $t0, $t0, 1                   # k++
+  sub    $t0, $t0, 1                   # k--
+  sub    $t1, $t1, 2                   # &board[i][k--]
+  sub    $t2, $t2, 32                  # &board[k--][j]
   j      s_r1_i1loop                   # Jump to top of k inner loop
 
 s_r1_i1loop_e:
-  move   $a0, $s1
-  jal    s_get_square_begin
-  move   $s5, $v0                      # int ii = get_square_begin(i);
-  move   $a0, $s2
-  jal    s_get_square_begin
-  move   $s6, $v0                      # int jj = get_square_begin(j);
-  move   $t0, $s5                      # int k = ii
+  srl    $t0, $s1, 2
+  sll    $t0, $t0, 2                   # int ii = get_square_begin(i);
+  srl    $t1, $s2, 2
+  sll    $t1, $t1, 2                   # int jj = get_square_begin(j);
+  move   $t2, $t0                      # int k = ii
 
 s_r1_i2loop:
-  add    $t2, $s5, 4
-  bge    $t0, $t2, s_r1_i2loop_e       # Break loop if(k >= ii + 4)
-  move   $t1, $s6                      # int l = jj
+  add    $t8, $t0, 4
+  bge    $t2, $t8, s_r1_i2loop_e       # Break loop if(k >= ii + 4)
+  move   $t3, $t1                      # int l = jj
+
+  sll    $t4, $t2, 4
+  add    $t4, $t4, $t3
+  sll    $t4, $t4, 1
+  add    $t4, $t4, $s3                 # &board[k][l,jj]
 
 s_r1_i2iloop:
-  add    $t2, $s6, 4
-  bge    $t1, $t2, s_r1_i2iloop_e      # Break inner loop if(l >= jj + 4)
-  xor    $t2, $t0, $s1
-  xor    $t3, $t1, $s2
-  bne    $t2, $0, s_r1_i21_skip        # Skip if(k != i)
-  bne    $t3, $0, s_r1_i21_skip        # Skip if(l != j)
-  add    $t1, $t1, 1                   # l++
+  add    $t5, $t1, 4
+  bge    $t3, $t5, s_r1_i2iloop_e      # Break inner loop if(l >= jj + 4)
+  bne    $t2, $s1, s_r1_i21_skip       # Skip if(k != i)
+  bne    $t3, $s2, s_r1_i21_skip       # Skip if(l != j)
+
+  add    $t3, $t3, 1                   # l++
+  add    $t4, $t4, 2                   # &board[k][l++]
   j      s_r1_i2iloop                  # Jump to top of inner l loop
 
 s_r1_i21_skip:
-  mul    $t2, $t0, 16
-  add    $t2, $t2, $t1
-  mul    $t2, $t2, 2
-  add    $t2, $t2, $s3                 # &board[k][l]
-  lhu    $t3, 0($t2)                   # board[k][l]
-  and    $t3, $t3, $s4                 # board[k][l] & value
-  beq    $t3, $0, s_r1_i22_skip        # Skip if((board[k][l] & value) == 0)
-  lhu    $t3, 0($t2)                   # board[k][l]
-  li     $t4, -1
-  xor    $t4, $t4, $s4                 # ~value
-  and    $t3, $t3, $t4                 # board[k][l] & ~value
-  sh     $t3, 0($t2)                   # board[k][l] &= ~value
-  li     $s0, 1                        # changed = true
+  lhu    $t5, 0($t4)                   # board[k][l]
+  and    $t6, $t5, $s4                 # board[k][l] & value
+  beqz   $t6, s_r1_i22_skip            # Skip if((board[k][l] & value) == 0)
+  sub    $t6, $0, 1
+  xor    $t6, $t6, $s4                 # ~value
+  and    $t6, $t6, $t5                 # board[k][l] & ~value
+  sh     $t6, 0($t4)                   # board[k][l] &= ~value
+  add    $s0, $0, 1                    # changed = true
 
 s_r1_i22_skip:
-  add    $t1, $t1, 1                   # l++
-  j      s_r1_i2iloop                  # Jump to top out inner l loop
+  add    $t3, $t3, 1                   # l++
+  add    $t4, $t4, 2                   # &board[k][l++]
+  j      s_r1_i2iloop                  # Jump to top of inner l loop
 
 s_r1_i2iloop_e:
-  add    $t0, $t0, 1                   # k++
+  add    $t2, $t2, 1                   # k++
   j      s_r1_i2loop                   # Jump to top of outer k loop
 
 s_r1_i2loop_e:
@@ -431,31 +433,24 @@ s_r1_iloop_e:
 
 s_r1_oloop_e:
   move   $v0, $s0
-  lw     $ra, 28($sp)                  # Restore $ra
-  lw     $s6, 24($sp)                  # Restore $s6
-  lw     $s5, 20($sp)                  # Restore $s5
-  lw     $s4, 16($sp)                  # Restore $s4
-  lw     $s3, 12($sp)                  # Restore $s3
-  lw     $s2, 8($sp)                   # Restore $s2
-  lw     $s1, 4($sp)                   # Restore $s1
   lw     $s0, 0($sp)                   # Restore $s0
-  add    $sp, $sp, 32                  # Deallocate stack memory
+  lw     $s1, 4($sp)                   # Restore $s1
+  lw     $s2, 8($sp)                   # Restore $s2
+  lw     $s3, 12($sp)                  # Restore $s3
+  lw     $s4, 16($sp)                  # Restore $s4
+  lw     $ra, 20($sp)                  # Restore $ra
+  add    $sp, $sp, 24                  # Deallocate stack memory
   jr     $ra                           # Return changed
 
-s_get_square_begin:
-  div    $v0, $a0, 4
-  mul    $v0, $v0, 4
-  jr     $ra
-
 s_has_single_bit_set:
-  beq    $a0, 0, s_hsbs_ret_zero       # Branch if(value == 0)
+  beqz   $a0, s_hsbs_ret_zero          # Branch if(value == 0)
   sub    $a1, $a0, 1
   and    $a1, $a0, $a1
-  bne    $a1, 0, s_hsbs_ret_zero       # Branch if((value & (value - 1)) == 0)
-  li     $v0, 1
+  bnez   $a1, s_hsbs_ret_zero          # Branch if((value & (value - 1)) == 0)
+  add    $v0, $0, 1
   jr     $ra                           # Return true
 
 s_hsbs_ret_zero:
-  li     $v0, 0
+  add    $v0, $0, $0
   jr     $ra                           # Return false
 

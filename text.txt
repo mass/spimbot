@@ -1,0 +1,301 @@
+        1 [0x00400000]	0x8fa40000  lw $4, 0($29)                   ; exceptions.s:183: lw $a0 0($sp)		# argc
+        1 [0x00400004]	0x27a50004  addiu $5, $29, 4                ; exceptions.s:184: addiu $a1 $sp 4		# argv
+        1 [0x00400008]	0x24a60004  addiu $6, $5, 4                 ; exceptions.s:185: addiu $a2 $a1 4		# envp
+        1 [0x0040000c]	0x00041080  sll $2, $4, 2                   ; exceptions.s:186: sll $v0 $a0 2
+        1 [0x00400010]	0x00c23021  addu $6, $6, $2                 ; exceptions.s:187: addu $a2 $a2 $v0
+        1 [0x00400014]	0x0c100009  jal 0x00400024 [main]           ; exceptions.s:188: jal main
+        0 [0x00400018]	0x00000000  nop                             ; exceptions.s:189: nop
+        0 [0x0040001c]	0x3402000a  ori $2, $0, 10                  ; exceptions.s:191: li $v0 10
+        0 [0x00400020]	0x0000000c  syscall                         ; exceptions.s:192: syscall			# syscall 10 (exit)
+        1 [0x00400024]	0x34088000  ori $8, $0, -32768              ; spimbot.s:96: li     $t0, TIMER_MASK
+        1 [0x00400028]	0x35081000  ori $8, $8, 4096                ; spimbot.s:97: or     $t0, $t0, BONK_MASK
+        1 [0x0040002c]	0x35080001  ori $8, $8, 1                   ; spimbot.s:98: or     $t0, $t0, 1
+        1 [0x00400030]	0x40886000  mtc0 $8, $12                    ; spimbot.s:99: mtc0   $t0, $12                      # Enable timer and bonk interrupts
+        1 [0x00400034]	0x3408000a  ori $8, $0, 10                  ; spimbot.s:101: li     $t0, 10
+        1 [0x00400038]	0x3c01ffff  lui $1, -1                      ; spimbot.s:102: sw     $t0, VELOCITY                 # SET_VELCOITY(10)
+        1 [0x0040003c]	0xac280010  sw $8, 16($1)
+        1 [0x00400040]	0x3c01ffff  lui $1, -1                      ; spimbot.s:104: lw     $t0, TIMER
+        1 [0x00400044]	0x8c28001c  lw $8, 28($1)
+        1 [0x00400048]	0x210807d0  addi $8, $8, 2000               ; spimbot.s:105: add    $t0, $t0, TIMER_FREQ
+        1 [0x0040004c]	0x3c01ffff  lui $1, -1                      ; spimbot.s:106: sw     $t0, TIMER                    # REQUEST_TIMER(TIMER() + 10)
+        1 [0x00400050]	0xac28001c  sw $8, 28($1)
+        1 [0x00400054]	0x3c011001  lui $1, 4097 [sudoku]           ; spimbot.s:108: la     $t0, sudoku
+        1 [0x00400058]	0x34280018  ori $8, $1, 24 [sudoku]
+        1 [0x0040005c]	0x3c01ffff  lui $1, -1                      ; spimbot.s:109: sw     $t0, SUDOKU_REQUEST           # Request new soduku puzzle
+        1 [0x00400060]	0xac280090  sw $8, 144($1)
+        1 [0x00400064]	0x3c011001  lui $1, 4097 [flags]            ; spimbot.s:111: la     $t0, flags
+        1 [0x00400068]	0x34280218  ori $8, $1, 536 [flags]
+        1 [0x0040006c]	0x3c01ffff  lui $1, -1                      ; spimbot.s:112: sw     $t0, FLAG_REQUEST             # FLAG_REQUEST(&flags)
+        1 [0x00400070]	0xac280050  sw $8, 80($1)
+        1 [0x00400074]	0x3c011001  lui $1, 4097                    ; spimbot.s:114: lw     $t0, flags($0)
+        1 [0x00400078]	0x8c280218  lw $8, 536($1)
+        1 [0x0040007c]	0x3c011001  lui $1, 4097                    ; spimbot.s:115: sw     $t0, target_x
+        1 [0x00400080]	0xac280010  sw $8, 16($1)
+        1 [0x00400084]	0x3c011001  lui $1, 4097                    ; spimbot.s:116: lw     $t1, flags+4($0)
+        1 [0x00400088]	0x8c29021c  lw $9, 540($1)
+        1 [0x0040008c]	0x3c011001  lui $1, 4097                    ; spimbot.s:117: sw     $t1, target_y                 # target = flags[0]
+        1 [0x00400090]	0xac290014  sw $9, 20($1)
+      103 [0x00400094]	0x3c011001  lui $1, 4097 [sudoku]           ; spimbot.s:120: la     $a0, sudoku
+      103 [0x00400098]	0x34240018  ori $4, $1, 24 [sudoku]
+      103 [0x0040009c]	0x0c100032  jal 0x004000c8 [sudoku_r1]      ; spimbot.s:121: jal    sudoku_r1                     # Run rule1 algorithm
+      102 [0x004000a0]	0x1440fffd  bne $2, $0, -12 [infinite-0x004000a0]; spimbot.s:122: bnez   $v0, infinite                 # Repeat rule1 if changes were made
+       13 [0x004000a4]	0x3c011001  lui $1, 4097 [sudoku]           ; spimbot.s:124: la     $t0, sudoku
+       13 [0x004000a8]	0x34280018  ori $8, $1, 24 [sudoku]
+       13 [0x004000ac]	0x3c01ffff  lui $1, -1                      ; spimbot.s:125: sw     $t0, SUDOKU_SOLVED            # Report solved sudoku
+       13 [0x004000b0]	0xac280094  sw $8, 148($1)
+       13 [0x004000b4]	0x3c011001  lui $1, 4097 [sudoku]           ; spimbot.s:127: la     $t0, sudoku
+       13 [0x004000b8]	0x34280018  ori $8, $1, 24 [sudoku]
+       13 [0x004000bc]	0x3c01ffff  lui $1, -1                      ; spimbot.s:128: sw     $t0, SUDOKU_REQUEST           # Request new soduku puzzle
+       13 [0x004000c0]	0xac280090  sw $8, 144($1)
+       13 [0x004000c4]	0x08100025  j 0x00400094 [infinite]         ; spimbot.s:130: j      infinite                      # Jump to top of loop
+      103 [0x004000c8]	0x23bdffe8  addi $29, $29, -24              ; spimbot.s:308: sub    $sp, $sp, 24                  # Allocate stack memory
+      104 [0x004000cc]	0xafb00000  sw $16, 0($29)                  ; spimbot.s:309: sw     $s0, 0($sp)                   # Save $s0
+      103 [0x004000d0]	0xafb10004  sw $17, 4($29)                  ; spimbot.s:310: sw     $s1, 4($sp)                   # Save $s1
+      103 [0x004000d4]	0xafb20008  sw $18, 8($29)                  ; spimbot.s:311: sw     $s2, 8($sp)                   # Save $s2
+      103 [0x004000d8]	0xafb3000c  sw $19, 12($29)                 ; spimbot.s:312: sw     $s3, 12($sp)                  # Save $s3
+      103 [0x004000dc]	0xafb40010  sw $20, 16($29)                 ; spimbot.s:313: sw     $s4, 16($sp)                  # Save $s4
+      103 [0x004000e0]	0xafbf0014  sw $31, 20($29)                 ; spimbot.s:314: sw     $ra, 20($sp)                  # Save $ra
+      103 [0x004000e4]	0x00008020  add $16, $0, $0                 ; spimbot.s:315: add    $s0, $0, $0                   # bool changed = false
+      103 [0x004000e8]	0x00008820  add $17, $0, $0                 ; spimbot.s:316: add    $s1, $0, $0                   # int i = 0
+      103 [0x004000ec]	0x00049821  addu $19, $0, $4                ; spimbot.s:317: move   $s3, $a0                      # &board
+     1743 [0x004000f0]	0x2a210010  slti $1, $17, 16                ; spimbot.s:320: bge    $s1, 16, s_r1_oloop_e         # Exit outer loop if(i >= 16)
+     1744 [0x004000f4]	0x10200053  beq $1, $0, 332 [s_r1_oloop_e-0x004000f4]
+     1641 [0x004000f8]	0x00009024  and $18, $0, $0                 ; spimbot.s:321: and    $s2, $0, $0                   # int j = 0
+    27909 [0x004000fc]	0x2a410010  slti $1, $18, 16                ; spimbot.s:324: bge    $s2, 16, s_r1_iloop_e         # Exit inner loop if(j >= 16)
+    27902 [0x00400100]	0x1020004e  beq $1, $0, 312 [s_r1_iloop_e-0x00400100]
+    26260 [0x00400104]	0x00114100  sll $8, $17, 4                  ; spimbot.s:326: sll    $t0, $s1, 4
+    26259 [0x00400108]	0x01124020  add $8, $8, $18                 ; spimbot.s:327: add    $t0, $t0, $s2
+    26268 [0x0040010c]	0x00084040  sll $8, $8, 1                   ; spimbot.s:328: sll    $t0, $t0, 1
+    26263 [0x00400110]	0x01134020  add $8, $8, $19                 ; spimbot.s:329: add    $t0, $t0, $s3                 # &board[i][j]
+    26265 [0x00400114]	0x95140000  lhu $20, 0($8)                  ; spimbot.s:331: lhu    $s4, 0($t0)                   # unsigned value = board[i][j]
+    26260 [0x00400118]	0x00142021  addu $4, $0, $20                ; spimbot.s:332: move   $a0, $s4
+    26252 [0x0040011c]	0x0c100099  jal 0x00400264 [s_has_single_bit_set]; spimbot.s:333: jal    s_has_single_bit_set
+    26271 [0x00400120]	0x10400044  beq $2, $0, 272 [s_r1_bit_set_skip-0x00400120]; spimbot.s:334: beqz   $v0, s_r1_bit_set_skip        # Branch if(!has_single_bit_set(value))
+    21132 [0x00400124]	0x2008000f  addi $8, $0, 15                 ; spimbot.s:336: add    $t0, $0, 15                   # int k = GRID_SQUARED - 1
+    21134 [0x00400128]	0x00114900  sll $9, $17, 4                  ; spimbot.s:338: sll    $t1, $s1, 4
+    21134 [0x0040012c]	0x01284820  add $9, $9, $8                  ; spimbot.s:339: add    $t1, $t1, $t0
+    21131 [0x00400130]	0x00094840  sll $9, $9, 1                   ; spimbot.s:340: sll    $t1, $t1, 1
+    21132 [0x00400134]	0x01334820  add $9, $9, $19                 ; spimbot.s:341: add    $t1, $t1, $s3                 # &board[i][k]
+    21135 [0x00400138]	0x00085100  sll $10, $8, 4                  ; spimbot.s:343: sll    $t2, $t0, 4
+    21140 [0x0040013c]	0x01525020  add $10, $10, $18               ; spimbot.s:344: add    $t2, $t2, $s2
+    21134 [0x00400140]	0x000a5040  sll $10, $10, 1                 ; spimbot.s:345: sll    $t2, $t2, 1
+    21132 [0x00400144]	0x01535020  add $10, $10, $19               ; spimbot.s:346: add    $t2, $t2, $s3                 # &board[k][j]
+   359228 [0x00400148]	0x05000017  bltz $8 92 [s_r1_i1loop_e-0x00400148]; spimbot.s:349: bltz   $t0, s_r1_i1loop_e            # Exit inner k loop if(k < 0)
+   338140 [0x0040014c]	0x11120009  beq $8, $18, 36 [s_r1_i11_skip-0x0040014c]; spimbot.s:350: beq    $t0, $s2, s_r1_i11_skip       # Skip if(k == j)
+   316980 [0x00400150]	0x952b0000  lhu $11, 0($9)                  ; spimbot.s:351: lhu    $t3, 0($t1)                   # board[i][k]
+   316986 [0x00400154]	0x01746024  and $12, $11, $20               ; spimbot.s:352: and    $t4, $t3, $s4                 # board[i][k] & value
+   316996 [0x00400158]	0x11800006  beq $12, $0, 24 [s_r1_i11_skip-0x00400158]; spimbot.s:353: beqz   $t4, s_r1_i11_skip            # Skip if((board[i][k] & value) == 0)
+     9540 [0x0040015c]	0x200cffff  addi $12, $0, -1                ; spimbot.s:354: sub    $t4, $0, 1
+     9537 [0x00400160]	0x01946026  xor $12, $12, $20               ; spimbot.s:355: xor    $t4, $t4, $s4
+     9536 [0x00400164]	0x016c6024  and $12, $11, $12               ; spimbot.s:356: and    $t4, $t3, $t4
+     9542 [0x00400168]	0xa52c0000  sh $12, 0($9)                   ; spimbot.s:357: sh     $t4, 0($t1)                   # board[i][k] &= ~value
+     9543 [0x0040016c]	0x20100001  addi $16, $0, 1                 ; spimbot.s:358: add    $s0, $0, 1                    # changed = true
+   338124 [0x00400170]	0x11110009  beq $8, $17, 36 [s_r1_i12_skip-0x00400170]; spimbot.s:361: beq    $t0, $s1, s_r1_i12_skip       # Skip if(k == i)
+   317003 [0x00400174]	0x954b0000  lhu $11, 0($10)                 ; spimbot.s:362: lhu    $t3, 0($t2)                   # board[k][j]
+   316979 [0x00400178]	0x01746024  and $12, $11, $20               ; spimbot.s:363: and    $t4, $t3, $s4                 # board[k][j] & value
+   316982 [0x0040017c]	0x11800006  beq $12, $0, 24 [s_r1_i12_skip-0x0040017c]; spimbot.s:364: beqz   $t4, s_r1_i12_skip            # Skip if((board[k][j] & value) == 0)
+     9919 [0x00400180]	0x200cffff  addi $12, $0, -1                ; spimbot.s:365: sub    $t4, $0, 1
+     9916 [0x00400184]	0x01946026  xor $12, $12, $20               ; spimbot.s:366: xor    $t4, $t4, $s4
+     9914 [0x00400188]	0x016c6024  and $12, $11, $12               ; spimbot.s:367: and    $t4, $t3, $t4
+     9920 [0x0040018c]	0xa54c0000  sh $12, 0($10)                  ; spimbot.s:368: sh     $t4, 0($t2)                   # board[k][j] &= ~value
+     9920 [0x00400190]	0x20100001  addi $16, $0, 1                 ; spimbot.s:369: add    $s0, $0, 1                    # changed = true
+   338120 [0x00400194]	0x2108ffff  addi $8, $8, -1                 ; spimbot.s:372: sub    $t0, $t0, 1                   # k--
+   338142 [0x00400198]	0x2129fffe  addi $9, $9, -2                 ; spimbot.s:373: sub    $t1, $t1, 2                   # &board[i][k--]
+   338132 [0x0040019c]	0x214affe0  addi $10, $10, -32              ; spimbot.s:374: sub    $t2, $t2, 32                  # &board[k--][j]
+   338128 [0x004001a0]	0x08100052  j 0x00400148 [s_r1_i1loop]      ; spimbot.s:375: j      s_r1_i1loop                   # Jump to top of k inner loop
+    21130 [0x004001a4]	0x00114082  srl $8, $17, 2                  ; spimbot.s:378: srl    $t0, $s1, 2
+    21134 [0x004001a8]	0x00084080  sll $8, $8, 2                   ; spimbot.s:379: sll    $t0, $t0, 2                   # int ii = get_square_begin(i);
+    21132 [0x004001ac]	0x00124882  srl $9, $18, 2                  ; spimbot.s:380: srl    $t1, $s2, 2
+    21134 [0x004001b0]	0x00094880  sll $9, $9, 2                   ; spimbot.s:381: sll    $t1, $t1, 2                   # int jj = get_square_begin(j);
+    21131 [0x004001b4]	0x00085021  addu $10, $0, $8                ; spimbot.s:382: move   $t2, $t0                      # int k = ii
+   105663 [0x004001b8]	0x21180004  addi $24, $8, 4                 ; spimbot.s:385: add    $t8, $t0, 4
+   105653 [0x004001bc]	0x0158082a  slt $1, $10, $24                ; spimbot.s:386: bge    $t2, $t8, s_r1_i2loop_e       # Break loop if(k >= ii + 4)
+   105659 [0x004001c0]	0x1020001b  beq $1, $0, 108 [s_r1_i2loop_e-0x004001c0]
+    84520 [0x004001c4]	0x00095821  addu $11, $0, $9                ; spimbot.s:387: move   $t3, $t1                      # int l = jj
+    84526 [0x004001c8]	0x000a6100  sll $12, $10, 4                 ; spimbot.s:389: sll    $t4, $t2, 4
+    84526 [0x004001cc]	0x018b6020  add $12, $12, $11               ; spimbot.s:390: add    $t4, $t4, $t3
+    84527 [0x004001d0]	0x000c6040  sll $12, $12, 1                 ; spimbot.s:391: sll    $t4, $t4, 1
+    84535 [0x004001d4]	0x01936020  add $12, $12, $19               ; spimbot.s:392: add    $t4, $t4, $s3                 # &board[k][l,jj]
+   422621 [0x004001d8]	0x212d0004  addi $13, $9, 4                 ; spimbot.s:395: add    $t5, $t1, 4
+   422651 [0x004001dc]	0x016d082a  slt $1, $11, $13                ; spimbot.s:396: bge    $t3, $t5, s_r1_i2iloop_e      # Break inner loop if(l >= jj + 4)
+   422652 [0x004001e0]	0x10200011  beq $1, $0, 68 [s_r1_i2iloop_e-0x004001e0]
+   338104 [0x004001e4]	0x15510005  bne $10, $17, 20 [s_r1_i21_skip-0x004001e4]; spimbot.s:397: bne    $t2, $s1, s_r1_i21_skip       # Skip if(k != i)
+    84527 [0x004001e8]	0x15720004  bne $11, $18, 16 [s_r1_i21_skip-0x004001e8]; spimbot.s:398: bne    $t3, $s2, s_r1_i21_skip       # Skip if(l != j)
+    21132 [0x004001ec]	0x216b0001  addi $11, $11, 1                ; spimbot.s:400: add    $t3, $t3, 1                   # l++
+    21132 [0x004001f0]	0x218c0002  addi $12, $12, 2                ; spimbot.s:401: add    $t4, $t4, 2                   # &board[k][l++]
+    21133 [0x004001f4]	0x08100076  j 0x004001d8 [s_r1_i2iloop]     ; spimbot.s:402: j      s_r1_i2iloop                  # Jump to top of inner l loop
+   316967 [0x004001f8]	0x958d0000  lhu $13, 0($12)                 ; spimbot.s:405: lhu    $t5, 0($t4)                   # board[k][l]
+   316964 [0x004001fc]	0x01b47024  and $14, $13, $20               ; spimbot.s:406: and    $t6, $t5, $s4                 # board[k][l] & value
+   316973 [0x00400200]	0x11c00006  beq $14, $0, 24 [s_r1_i22_skip-0x00400200]; spimbot.s:407: beqz   $t6, s_r1_i22_skip            # Skip if((board[k][l] & value) == 0)
+     4475 [0x00400204]	0x200effff  addi $14, $0, -1                ; spimbot.s:408: sub    $t6, $0, 1
+     4476 [0x00400208]	0x01d47026  xor $14, $14, $20               ; spimbot.s:409: xor    $t6, $t6, $s4                 # ~value
+     4473 [0x0040020c]	0x01cd7024  and $14, $14, $13               ; spimbot.s:410: and    $t6, $t6, $t5                 # board[k][l] & ~value
+     4476 [0x00400210]	0xa58e0000  sh $14, 0($12)                  ; spimbot.s:411: sh     $t6, 0($t4)                   # board[k][l] &= ~value
+     4475 [0x00400214]	0x20100001  addi $16, $0, 1                 ; spimbot.s:412: add    $s0, $0, 1                    # changed = true
+   316959 [0x00400218]	0x216b0001  addi $11, $11, 1                ; spimbot.s:415: add    $t3, $t3, 1                   # l++
+   316969 [0x0040021c]	0x218c0002  addi $12, $12, 2                ; spimbot.s:416: add    $t4, $t4, 2                   # &board[k][l++]
+   316971 [0x00400220]	0x08100076  j 0x004001d8 [s_r1_i2iloop]     ; spimbot.s:417: j      s_r1_i2iloop                  # Jump to top of inner l loop
+    84531 [0x00400224]	0x214a0001  addi $10, $10, 1                ; spimbot.s:420: add    $t2, $t2, 1                   # k++
+    84526 [0x00400228]	0x0810006e  j 0x004001b8 [s_r1_i2loop]      ; spimbot.s:421: j      s_r1_i2loop                   # Jump to top of outer k loop
+    21129 [0x0040022c]	0x0810008c  j 0x00400230 [s_r1_bit_set_skip]; spimbot.s:424: j      s_r1_bit_set_skip             # Jump if(has_single_bit_set(value))
+    26257 [0x00400230]	0x22520001  addi $18, $18, 1                ; spimbot.s:427: add    $s2, $s2, 1                   # j++
+    26261 [0x00400234]	0x0810003f  j 0x004000fc [s_r1_iloop]       ; spimbot.s:428: j      s_r1_iloop                    # Jump to top of inner loop
+     1640 [0x00400238]	0x22310001  addi $17, $17, 1                ; spimbot.s:431: add    $s1, $s1, 1                   # i++
+     1640 [0x0040023c]	0x0810003c  j 0x004000f0 [s_r1_oloop]       ; spimbot.s:432: j      s_r1_oloop                    # Jump to top of outer loop
+      102 [0x00400240]	0x00101021  addu $2, $0, $16                ; spimbot.s:435: move   $v0, $s0
+      102 [0x00400244]	0x8fb00000  lw $16, 0($29)                  ; spimbot.s:436: lw     $s0, 0($sp)                   # Restore $s0
+      102 [0x00400248]	0x8fb10004  lw $17, 4($29)                  ; spimbot.s:437: lw     $s1, 4($sp)                   # Restore $s1
+      102 [0x0040024c]	0x8fb20008  lw $18, 8($29)                  ; spimbot.s:438: lw     $s2, 8($sp)                   # Restore $s2
+      102 [0x00400250]	0x8fb3000c  lw $19, 12($29)                 ; spimbot.s:439: lw     $s3, 12($sp)                  # Restore $s3
+      102 [0x00400254]	0x8fb40010  lw $20, 16($29)                 ; spimbot.s:440: lw     $s4, 16($sp)                  # Restore $s4
+      102 [0x00400258]	0x8fbf0014  lw $31, 20($29)                 ; spimbot.s:441: lw     $ra, 20($sp)                  # Restore $ra
+      102 [0x0040025c]	0x23bd0018  addi $29, $29, 24               ; spimbot.s:442: add    $sp, $sp, 24                  # Deallocate stack memory
+      102 [0x00400260]	0x03e00008  jr $31                          ; spimbot.s:443: jr     $ra                           # Return changed
+    26263 [0x00400264]	0x10800006  beq $4, $0, 24 [s_hsbs_ret_zero-0x00400264]; spimbot.s:446: beqz   $a0, s_hsbs_ret_zero          # Branch if(value == 0)
+    26265 [0x00400268]	0x2085ffff  addi $5, $4, -1                 ; spimbot.s:447: sub    $a1, $a0, 1
+    26262 [0x0040026c]	0x00852824  and $5, $4, $5                  ; spimbot.s:448: and    $a1, $a0, $a1
+    26265 [0x00400270]	0x14a00003  bne $5, $0, 12 [s_hsbs_ret_zero-0x00400270]; spimbot.s:449: bnez   $a1, s_hsbs_ret_zero          # Branch if((value & (value - 1)) == 0)
+    21128 [0x00400274]	0x20020001  addi $2, $0, 1                  ; spimbot.s:450: add    $v0, $0, 1
+    21132 [0x00400278]	0x03e00008  jr $31                          ; spimbot.s:451: jr     $ra                           # Return true
+     5131 [0x0040027c]	0x00001020  add $2, $0, $0                  ; spimbot.s:454: add    $v0, $0, $0
+     5132 [0x00400280]	0x03e00008  jr $31                          ; spimbot.s:455: jr     $ra                           # Return false
+
+
+kernel text segment
+
+     4938 [0x80000180]	0x0001d821  addu $27, $0, $1                ; spimbot.s:146: move   $k1, $at                      # Save $at
+     4938 [0x80000184]	0x3c019000  lui $1, -28672 [chunkIH]        ; spimbot.s:148: la     $k0, chunkIH
+     4938 [0x80000188]	0x343a0208  ori $26, $1, 520 [chunkIH]
+     4938 [0x8000018c]	0xaf440000  sw $4, 0($26)                   ; spimbot.s:149: sw     $a0, 0($k0)                  # Save $a0
+     4938 [0x80000190]	0xaf450004  sw $5, 4($26)                   ; spimbot.s:150: sw     $a1, 4($k0)                  # Save $a1
+     4938 [0x80000194]	0xaf420008  sw $2, 8($26)                   ; spimbot.s:151: sw     $v0, 8($k0)                  # Save $v0
+     4938 [0x80000198]	0x401a6800  mfc0 $26, $13                   ; spimbot.s:153: mfc0   $k0, $13                      # Get interrupt cause register
+     4938 [0x8000019c]	0x001a2082  srl $4, $26, 2                  ; spimbot.s:154: srl    $a0, $k0, 2
+     4938 [0x800001a0]	0x3084000f  andi $4, $4, 15                 ; spimbot.s:155: and    $a0, $a0, 0xf                 # Mask with ExcCode field
+     4938 [0x800001a4]	0x14800042  bne $4, $0, 264 [non_interrupt-0x800001a4]; spimbot.s:156: bnez   $a0, non_interrupt            # Non-interrupt
+     9876 [0x800001a8]	0x401a6800  mfc0 $26, $13                   ; spimbot.s:159: mfc0   $k0, $13                      # Get interrupt cause register
+     9876 [0x800001ac]	0x13400044  beq $26, $0, 272 [id_done-0x800001ac]; spimbot.s:160: beqz   $k0, id_done                  # Handled all interrupts
+     4938 [0x800001b0]	0x33441000  andi $4, $26, 4096              ; spimbot.s:162: and    $a0, $k0, BONK_MASK
+     4938 [0x800001b4]	0x14800008  bne $4, $0, 32 [interrupt_bonk-0x800001b4]; spimbot.s:163: bnez   $a0, interrupt_bonk           # Handle bonk interrupt
+     4916 [0x800001b8]	0x33448000  andi $4, $26, -32768            ; spimbot.s:165: and    $a0, $k0, TIMER_MASK
+     4916 [0x800001bc]	0x14800011  bne $4, $0, 68 [interrupt_timer-0x800001bc]; spimbot.s:166: bnez   $a0, interrupt_timer          # Handle timer interrupt
+        0 [0x800001c0]	0x34020004  ori $2, $0, 4                   ; spimbot.s:168: li     $v0, SYS_PRINT_STRING
+        0 [0x800001c4]	0x3c019000  lui $1, -28672 [unhandled_str]  ; spimbot.s:169: la     $a0, unhandled_str
+        0 [0x800001c8]	0x3424022d  ori $4, $1, 557 [unhandled_str]
+        0 [0x800001cc]	0x0000000c  syscall                         ; spimbot.s:170: syscall                              # Print unhandled interrupt message
+        0 [0x800001d0]	0x080000af  j 0x000002bc [id_done]          ; spimbot.s:172: j      id_done                       # Finish interrupt handler
+       22 [0x800001d4]	0x3c01ffff  lui $1, -1                      ; spimbot.s:175: sw     $0, BONK_ACKNOWLEDGE          # Acknowledge bonk interrupt
+       22 [0x800001d8]	0xac200060  sw $0, 96($1)
+       22 [0x800001dc]	0x34020087  ori $2, $0, 135                 ; spimbot.s:177: li     $v0, 135
+       22 [0x800001e0]	0x3c01ffff  lui $1, -1                      ; spimbot.s:178: sw     $v0, ANGLE
+       22 [0x800001e4]	0xac220014  sw $2, 20($1)
+       22 [0x800001e8]	0x3c01ffff  lui $1, -1                      ; spimbot.s:179: sw     $0, ANGLE_CONTROL             # Turn 135 degrees
+       22 [0x800001ec]	0xac200018  sw $0, 24($1)
+       22 [0x800001f0]	0x3402000a  ori $2, $0, 10                  ; spimbot.s:181: li     $v0, 10
+       22 [0x800001f4]	0x3c01ffff  lui $1, -1                      ; spimbot.s:182: sw     $v0, VELOCITY                 # SET_VELOCITY(10)
+       22 [0x800001f8]	0xac220010  sw $2, 16($1)
+       22 [0x800001fc]	0x0800006a  j 0x000001a8 [interrupt_dispatch]; spimbot.s:184: j      interrupt_dispatch
+     4916 [0x80000200]	0x3c01ffff  lui $1, -1                      ; spimbot.s:187: sw     $0, TIMER_ACKNOWLEDGE         # Acknowledge timer interrupt
+     4916 [0x80000204]	0xac20006c  sw $0, 108($1)
+     4916 [0x80000208]	0x3c01ffff  lui $1, -1                      ; spimbot.s:189: lw     $a0, FLAGS_IN_HAND
+     4916 [0x8000020c]	0x8c240058  lw $4, 88($1)
+     4916 [0x80000210]	0x3c01ffff  lui $1, -1                      ; spimbot.s:190: sw     $0, PICK_FLAG
+     4916 [0x80000214]	0xac200054  sw $0, 84($1)
+     4916 [0x80000218]	0x3c01ffff  lui $1, -1                      ; spimbot.s:191: lw     $a1, FLAGS_IN_HAND
+     4916 [0x8000021c]	0x8c250058  lw $5, 88($1)
+     4916 [0x80000220]	0x0085082a  slt $1, $4, $5                  ; spimbot.s:192: ble    $a1, $a0, it_skip_target
+     4916 [0x80000224]	0x1020000d  beq $1, $0, 52 [it_skip_target-0x80000224]
+        3 [0x80000228]	0x3c011001  lui $1, 4097 [flags]            ; spimbot.s:194: la     $a0, flags
+        3 [0x8000022c]	0x34240218  ori $4, $1, 536 [flags]
+        3 [0x80000230]	0x3c01ffff  lui $1, -1                      ; spimbot.s:195: sw     $a0, FLAG_REQUEST
+        3 [0x80000234]	0xac240050  sw $4, 80($1)
+        3 [0x80000238]	0x3c011001  lui $1, 4097                    ; spimbot.s:196: lw     $a0, flags($0)
+        3 [0x8000023c]	0x8c240218  lw $4, 536($1)
+        3 [0x80000240]	0x3c011001  lui $1, 4097                    ; spimbot.s:197: sw     $a0, target_x
+        3 [0x80000244]	0xac240010  sw $4, 16($1)
+        3 [0x80000248]	0x3c011001  lui $1, 4097                    ; spimbot.s:198: lw     $a1, flags+4($0)
+        3 [0x8000024c]	0x8c25021c  lw $5, 540($1)
+        3 [0x80000250]	0x3c011001  lui $1, 4097                    ; spimbot.s:199: sw     $a1, target_y
+        3 [0x80000254]	0xac250014  sw $5, 20($1)
+     4916 [0x80000258]	0x3c01ffff  lui $1, -1                      ; spimbot.s:202: lw     $a0, BOT_X
+     4916 [0x8000025c]	0x8c240020  lw $4, 32($1)
+     4916 [0x80000260]	0x28810018  slti $1, $4, 24                 ; spimbot.s:203: bge    $a0, BASE_RADIUS, it_skip_base # Skip if right of base
+     4916 [0x80000264]	0x1020000c  beq $1, $0, 48 [it_skip_base-0x80000264]
+        5 [0x80000268]	0x3c01ffff  lui $1, -1                      ; spimbot.s:205: lw     $a0, BOT_Y
+        5 [0x8000026c]	0x8c240024  lw $4, 36($1)
+        5 [0x80000270]	0x288100ae  slti $1, $4, 174                ; spimbot.s:206: bge    $a0, BE_B, it_skip_base       # Skip if below base
+        5 [0x80000274]	0x10200008  beq $1, $0, 32 [it_skip_base-0x80000274]
+        5 [0x80000278]	0x2881007f  slti $1, $4, 127                ; spimbot.s:207: ble    $a0, BE_T, it_skip_base       # Skip if above base
+        5 [0x8000027c]	0x14200006  bne $1, $0, 24 [it_skip_base-0x8000027c]
+        5 [0x80000280]	0x340400b4  ori $4, $0, 180                 ; spimbot.s:209: li     $a0, 180
+        5 [0x80000284]	0x3c01ffff  lui $1, -1                      ; spimbot.s:210: sw     $a0, ANGLE
+        5 [0x80000288]	0xac240014  sw $4, 20($1)
+        5 [0x8000028c]	0x3c01ffff  lui $1, -1                      ; spimbot.s:211: sw     $0, ANGLE_CONTROL             # Turn around
+        5 [0x80000290]	0xac200018  sw $0, 24($1)
+     4916 [0x80000294]	0x3c01ffff  lui $1, -1                      ; spimbot.s:214: lw     $a0, TIMER
+     4916 [0x80000298]	0x8c24001c  lw $4, 28($1)
+     4916 [0x8000029c]	0x208407d0  addi $4, $4, 2000               ; spimbot.s:215: add    $a0, $a0, TIMER_FREQ
+     4916 [0x800002a0]	0x3c01ffff  lui $1, -1                      ; spimbot.s:216: sw     $a0, TIMER                    # REQUEST_TIMER(TIMER() + TIMER_FREQ)
+     4916 [0x800002a4]	0xac24001c  sw $4, 28($1)
+     4916 [0x800002a8]	0x0800006a  j 0x000001a8 [interrupt_dispatch]; spimbot.s:218: j      interrupt_dispatch            # Handle further interrupts
+        0 [0x800002ac]	0x34020004  ori $2, $0, 4                   ; spimbot.s:221: li     $v0, SYS_PRINT_STRING
+        0 [0x800002b0]	0x3c019000  lui $1, -28672 [non_intrpt_str] ; spimbot.s:222: la     $a0, non_intrpt_str
+        0 [0x800002b4]	0x34240214  ori $4, $1, 532 [non_intrpt_str]
+        0 [0x800002b8]	0x0000000c  syscall                         ; spimbot.s:223: syscall                              # Print non-interrupt error message
+     4938 [0x800002bc]	0x3c019000  lui $1, -28672 [chunkIH]        ; spimbot.s:226: la     $k0, chunkIH
+     4938 [0x800002c0]	0x343a0208  ori $26, $1, 520 [chunkIH]
+     4938 [0x800002c4]	0x8f440000  lw $4, 0($26)                   ; spimbot.s:227: lw     $a0, 0($k0)                   # Restore $a0
+     4938 [0x800002c8]	0x8f450004  lw $5, 4($26)                   ; spimbot.s:228: lw     $a1, 4($k0)                   # Restore $a1
+     4938 [0x800002cc]	0x8f420008  lw $2, 8($26)                   ; spimbot.s:229: lw     $v0, 8($k0)                   # Restore $v0
+     4938 [0x800002d0]	0x001b0821  addu $1, $0, $27                ; spimbot.s:231: move   $at, $k1                      # Restore $at
+     4938 [0x800002d4]	0x42000018  eret                            ; spimbot.s:233: eret                                 # Return
+        0 [0x800002d8]	0x70842002  mul $4, $4, $4                  ; spimbot.s:242: mul    $a0, $a0, $a0                 # x^2
+        0 [0x800002dc]	0x70a52802  mul $5, $5, $5                  ; spimbot.s:243: mul    $a1, $a1, $a1                 # y^2
+        0 [0x800002e0]	0x00851020  add $2, $4, $5                  ; spimbot.s:244: add    $v0, $a0, $a1                 # x^2 + y^2
+        0 [0x800002e4]	0x44820000  mtc1 $2, $f0                    ; spimbot.s:245: mtc1   $v0, $f0
+        0 [0x800002e8]	0x46800020  cvt.s.w $f0, $f0                ; spimbot.s:246: cvt.s.w $f0, $f0                     # float(x^2 + y^2)
+        0 [0x800002ec]	0x46000004  sqrt.s $f0, $f0                 ; spimbot.s:247: sqrt.s $f0, $f0                      # sqrt(x^2 + y^2)
+        0 [0x800002f0]	0x46000024  cvt.w.s $f0, $f0                ; spimbot.s:248: cvt.w.s $f0, $f0                     # int(sqrt(...))
+        0 [0x800002f4]	0x44020000  mfc1 $2, $f0                    ; spimbot.s:249: mfc1   $v0, $f0
+        0 [0x800002f8]	0x03e00008  jr $31                          ; spimbot.s:250: jr     $ra
+        0 [0x800002fc]	0x34020000  ori $2, $0, 0                   ; spimbot.s:255: li     $v0, 0                        # angle = 0;
+        0 [0x80000300]	0x00044021  addu $8, $0, $4                 ; spimbot.s:257: abs    $t0, $a0                      # get absolute values
+        0 [0x80000304]	0x04810002  bgez $4 8
+        0 [0x80000308]	0x00044022  sub $8, $0, $4
+        0 [0x8000030c]	0x00054821  addu $9, $0, $5                 ; spimbot.s:258: abs    $t1, $a1
+        0 [0x80000310]	0x04a10002  bgez $5 8
+        0 [0x80000314]	0x00054822  sub $9, $0, $5
+        0 [0x80000318]	0x0109082a  slt $1, $8, $9                  ; spimbot.s:259: ble    $t1, $t0, no_TURN_90          # Branch if(abs(y) < abs(x))
+        0 [0x8000031c]	0x10200005  beq $1, $0, 20 [no_TURN_90-0x8000031c]
+        0 [0x80000320]	0x00054021  addu $8, $0, $5                 ; spimbot.s:261: move   $t0, $a1                      # int temp = y;
+        0 [0x80000324]	0x00042822  sub $5, $0, $4                  ; spimbot.s:262: neg    $a1, $a0                      # y = -x;
+        0 [0x80000328]	0x00082021  addu $4, $0, $8                 ; spimbot.s:263: move   $a0, $t0                      # x = temp;
+        0 [0x8000032c]	0x3402005a  ori $2, $0, 90                  ; spimbot.s:264: li     $v0, 90                       # angle = 90;
+        0 [0x80000330]	0x04810002  bgez $4 8 [pos_x-0x80000330]    ; spimbot.s:267: bgez   $a0, pos_x                    # skip if (x >= 0)
+        0 [0x80000334]	0x204200b4  addi $2, $2, 180                ; spimbot.s:269: add    $v0, $v0, 180                 # angle += 180;
+        0 [0x80000338]	0x44840000  mtc1 $4, $f0                    ; spimbot.s:272: mtc1   $a0, $f0
+        0 [0x8000033c]	0x44850800  mtc1 $5, $f1                    ; spimbot.s:273: mtc1   $a1, $f1
+        0 [0x80000340]	0x46800020  cvt.s.w $f0, $f0                ; spimbot.s:274: cvt.s.w $f0, $f0                     # convert from ints to floats
+        0 [0x80000344]	0x46800860  cvt.s.w $f1, $f1                ; spimbot.s:275: cvt.s.w $f1, $f1
+        0 [0x80000348]	0x46000803  div.s $f0, $f1, $f0             ; spimbot.s:277: div.s  $f0, $f1, $f0                 # float v = (float) y / (float) x;
+        0 [0x8000034c]	0x46000042  mul.s $f1, $f0, $f0             ; spimbot.s:279: mul.s  $f1, $f0, $f0                 # v^^2
+        0 [0x80000350]	0x46000882  mul.s $f2, $f1, $f0             ; spimbot.s:280: mul.s  $f2, $f1, $f0                 # v^^3
+        0 [0x80000354]	0x3c011001  lui $1, 4097                    ; spimbot.s:281: l.s    $f3, three                    # load 5.0
+        0 [0x80000358]	0xc4230000  lwc1 $f3, 0($1)
+        0 [0x8000035c]	0x460310c3  div.s $f3, $f2, $f3             ; spimbot.s:282: div.s  $f3, $f2, $f3                 # v^^3/3
+        0 [0x80000360]	0x46030181  sub.s $f6, $f0, $f3             ; spimbot.s:283: sub.s  $f6, $f0, $f3                 # v - v^^3/3
+        0 [0x80000364]	0x46020902  mul.s $f4, $f1, $f2             ; spimbot.s:285: mul.s  $f4, $f1, $f2                 # v^^5
+        0 [0x80000368]	0x3c011001  lui $1, 4097                    ; spimbot.s:286: l.s    $f5, five                     # load 3.0
+        0 [0x8000036c]	0xc4250004  lwc1 $f5, 4($1)
+        0 [0x80000370]	0x46052143  div.s $f5, $f4, $f5             ; spimbot.s:287: div.s  $f5, $f4, $f5                 # v^^5/5
+        0 [0x80000374]	0x46053180  add.s $f6, $f6, $f5             ; spimbot.s:288: add.s  $f6, $f6, $f5                 # value = v - v^^3/3 + v^^5/5
+        0 [0x80000378]	0x3c011001  lui $1, 4097                    ; spimbot.s:290: l.s     
+        0 [0x8000037c]	0xc4280008  lwc1 $f8, 8($1)
+        0 [0x80000380]	0x46083183  div.s $f6, $f6, $f8             ; spimbot.s:291: div.s  $f6, $f6, $f8                 # value / PI
+        0 [0x80000384]	0x3c011001  lui $1, 4097                    ; spimbot.s:292: l.s    $f7, f180                     # load 180.0
+        0 [0x80000388]	0xc427000c  lwc1 $f7, 12($1)
+        0 [0x8000038c]	0x46073182  mul.s $f6, $f6, $f7             ; spimbot.s:293: mul.s  $f6, $f6, $f7                 # 180.0 * value / PI
+        0 [0x80000390]	0x460031a4  cvt.w.s $f6, $f6                ; spimbot.s:295: cvt.w.s $f6, $f6                     # convert "delta" back to integer
+        0 [0x80000394]	0x44083000  mfc1 $8, $f6                    ; spimbot.s:296: mfc1   $t0, $f6
+        0 [0x80000398]	0x00481020  add $2, $2, $8                  ; spimbot.s:297: add    $v0, $v0, $t0                 # angle += delta
+        0 [0x8000039c]	0x03e00008  jr $31                          ; spimbot.s:299: jr     $ra
