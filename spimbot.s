@@ -73,7 +73,7 @@ SYS_PRINT_CHAR     = 11
 TIMER_FREQ         = 2000
 
 # THRESHOLDS
-WIN_THRESHOLD      = 3
+DEF_THRESHOLD      = 3
 HAND_THRESHOLD     = 3
 
 # Float constants
@@ -84,8 +84,8 @@ f180:              .float 180.0
 
 # Data member storage
 defense_mode:      .word 0
-target_x:          .word 0
-target_y:          .word 0
+target_x:          .word 148
+target_y:          .word 150
 other_x:           .word -1
 other_y:           .word -1
 
@@ -220,14 +220,45 @@ interrupt_timer:
   lw     $a0, FLAGS_IN_HAND
   sw     $0, PICK_FLAG                 # Attempt to pick up flag (no penalty)
   lw     $a1, FLAGS_IN_HAND
+
   beq    $a1, $a0, it_skip_target      # Find new target if flag was picked
 
   bge    $a1, HAND_THRESHOLD, it_target_base # Return to base if enough flags
 
+  jal    select_target
+  jal    turn_to_target
+
+it_skip_target:
+  lw     $t0, defense_mode
+  beqz   $t0, it_skip_defense
+
+  lw     $t0, BOT_X
+  bne    $t0, 148, it_skip_defense_nav
+
+  lw     $t0, other_y
+  lw     $t1, BOT_Y
+  blt    $t1, $t0, it_defense_down
+
+  add    $a0, $0, 270
+  sw     $a0, ANGLE
+
+  add    $a0, $0, 1
+  sw     $a0, ANGLE_CONTROL
+  j      it_skip_nav
+
+it_defense_down:
+  add    $a0, $0, 90
+  sw     $a0, ANGLE
+
+  add    $a0, $0, 1
+  sw     $a0, ANGLE_CONTROL
+  j      it_skip_nav
+
+it_skip_defense_nav:
   jal    select_target                 # select_target
   jal    turn_to_target                # Turn to target
 
-  j      it_skip_target
+  j      it_skip_nav
 
 it_target_base:
   sw     $0, GENERATE_FLAG
@@ -241,44 +272,33 @@ it_target_base:
   add    $a0, $0, 12
   sw     $a0, target_x                 # target_x = 12 (in base)
   jal    turn_to_target                # Turn to target
-
-it_skip_target:
-  lw     $a0, SCORE                    # Get our score
-  lw     $a1, ENEMY_SCORE              # Get enemy score
-
-  sub    $v0, $a0, WIN_THRESHOLD
-  ble    $v0, $a1, it_enable_off       # Enable offense if margin is small
-
-  lw     $a0, defense_mode
-  bgtz   $a0, it_skip_defense          # Skip if already in defense mode
-
-  add    $v0, $0, 1
-  sw     $v0, defense_mode             # Enable defense mode
-
-  jal    select_target                 # Target defense position
-  jal    turn_to_target                # Turn to target
-
-  j      it_skip_defense
-
-it_enable_off:
-  lw     $a0, defense_mode
-  beqz   $a0, it_skip_defense          # Skip if already in offense mode
-
-  jal    select_target                 # Target next flag
-  jal    turn_to_target                # Turn to target
+  j      it_skip_nav
 
 it_skip_defense:
   lw     $a0, BOT_X
-  bge    $a0, BASE_RADIUS, it_skip_base # Skip if right of base
+  bge    $a0, BASE_RADIUS, it_skip_nav # Skip if right of base
 
   lw     $a0, BOT_Y
-  bge    $a0, BE_B, it_skip_base       # Skip if below base
-  ble    $a0, BE_T, it_skip_base       # Skip if above base
+  bge    $a0, BE_B, it_skip_nav        # Skip if below base
+  ble    $a0, BE_T, it_skip_nav        # Skip if above base
 
   jal    select_target                 # Target next flag
   jal    turn_to_target                # Turn to target
 
-it_skip_base:
+it_skip_nav:
+  lw     $a0, SCORE                    # Get our score
+  lw     $a1, ENEMY_SCORE              # Get enemy score
+
+  add    $v0, $a1, DEF_THRESHOLD
+  bgt    $a0, $v0, it_enable_def
+
+  jal    enable_offense                # Enable offense if margin is small
+  j      it_finish
+
+it_enable_def:
+  jal    enable_defense
+
+it_finish:
   lw     $a0, TIMER
   add    $a0, $a0, TIMER_FREQ
   sw     $a0, TIMER                    # REQUEST_TIMER(TIMER() + TIMER_FREQ)
@@ -306,6 +326,42 @@ id_done:
 # Helper Functions #
 ####################
 
+### void enable_offense()
+### Changes to offense mode if not already in offense mode
+enable_offense:
+  lw     $t0, defense_mode
+  beqz   $t0, eo_return
+
+  sw     $0, defense_mode
+  jal    select_target
+  jal    turn_to_target
+
+eo_return:
+  jr     $ra
+
+
+### void enable_defense()
+### Changes to defense mode if not already in defense mode
+enable_defense:
+  sub    $sp, $sp, 4
+  sw     $ra, 0($sp)
+  lw     $a0, defense_mode
+  bgtz   $a0, ed_return                # Skip if already in defense mode
+
+  add    $v0, $0, 1
+  sw     $v0, defense_mode             # Enable defense mode
+
+  jal    select_target                 # Target defense position
+  jal    turn_to_target                # Turn to target
+
+ed_return:
+  lw     $ra, 0($sp)
+  add    $sp, $sp, 4
+  jr     $ra
+
+### bool select_target()
+### Updates the target_x and target_y variables with correct values
+### Returns true if defense target and false if offense target
 select_target:
   lw     $t0, defense_mode
   beqz   $t0, st_offense
@@ -323,34 +379,38 @@ st_offense:
   la     $a0, flags
   sw     $a0, FLAG_REQUEST
   lw     $a0, flags($0)
+  bltz   $a0, st_no_flags              # Branch if flags[0].x < 0
   sw     $a0, target_x                 # target_x = flags[0].x
   lw     $a1, flags+4($0)
   sw     $a1, target_y                 # target_y = flags[0].y
+  j      st_return_false
 
+st_no_flags:
+  li     $a0, 12
+  li     $a1, 150
+  sw     $a0, target_x                 # target_x = 12;
+  sw     $a1, target_y                 # target_y = 150;
+
+st_return_false:
   move   $v0, $0
   jr     $ra                           # Return false (offense mode)
 
 
+### void turn_to_target
+### Turns the spimbot to face the target
 turn_to_target:
   la     $k0, chunkIH
   sw     $ra, 20($k0)
 
   lw     $t0, target_x
   lw     $t1, BOT_X
-  sub    $a0, $t1, $t0                 # x = other_x - target_x
+  sub    $a0, $t0, $t1                 # x = other_x - target_x
 
   lw     $t0, target_y
   lw     $t1, BOT_Y
-  sub    $a1, $t1, $t0                 # y = other_y - target_y
+  sub    $a1, $t0, $t1                 # y = other_y - target_y
 
   jal    sb_arctan                     # sb_arctan(x, y)
-
-  sw     $v0, PRINT_INT
-  lw     $t0, target_x
-  lw     $t1, target_y
-  sw     $t0, PRINT_INT
-  sw     $t1, PRINT_INT
-  add    $v0, $v0, 180
 
   add    $t0, $0, 1
   sw     $v0, ANGLE
