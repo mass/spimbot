@@ -2,7 +2,7 @@
 # File: spimbot.s       #
 #                       #
 # Author: Andrew Mass   #
-# Date:   2014-05-06    #
+# Date:   2014-05-08    #
 #                       #
 # "The distance between #
 # insanity and genius   #
@@ -86,8 +86,8 @@ f180:              .float 180.0
 defense_mode:      .word 0
 target_x:          .word 0
 target_y:          .word 0
-other_x:           .word 0
-other_y:           .word 0
+other_x:           .word -1
+other_y:           .word -1
 
 # Sudoku board memory
 sudoku:            .space 512
@@ -104,12 +104,12 @@ main:
   or     $t0, $t0, BONK_MASK
   or     $t0, $t0, COORDS_MASK
   or     $t0, $t0, 1
-  mtc0   $t0, $12                      # Enable timer and bonk interrupts
+  mtc0   $t0, $12                      # Enable interrupts
 
   li     $t0, 10
   sw     $t0, VELOCITY                 # SET_VELCOITY(10)
 
-  sw     $0, COORDS_REQUEST            # REQUEST_COORDS()
+  sw     $0, COORDS_REQUEST            # REQUEST_ENEMY_COORDS()
 
   lw     $t0, TIMER
   add    $t0, $t0, TIMER_FREQ
@@ -128,7 +128,7 @@ main:
 
   sw     $0, ANGLE
   add    $t0, $0, 1
-  sw     $t0, ANGLE_CONTROL
+  sw     $t0, ANGLE_CONTROL            # SET_ABSOLUTE_ANGLE(0)
 
 infinite:
   la     $a0, sudoku
@@ -160,11 +160,11 @@ interrupt_handler:
   move   $k1, $at                      # Save $at
 .set at
   la     $k0, chunkIH
-  sw     $a0, 0($k0)                  # Save $a0
-  sw     $a1, 4($k0)                  # Save $a1
-  sw     $t0, 8($k0)                  # Save $t0
-  sw     $t1, 12($k0)                 # Save $t1
-  sw     $v0, 16($k0)                 # Save $v0
+  sw     $a0, 0($k0)                   # Save $a0
+  sw     $a1, 4($k0)                   # Save $a1
+  sw     $t0, 8($k0)                   # Save $t0
+  sw     $t1, 12($k0)                  # Save $t1
+  sw     $v0, 16($k0)                  # Save $v0
 
   mfc0   $k0, $13                      # Get interrupt cause register
   srl    $a0, $k0, 2
@@ -193,21 +193,17 @@ interrupt_dispatch:
 interrupt_bonk:
   sw     $0, BONK_ACKNOWLEDGE          # Acknowledge bonk interrupt
 
-  #li     $v0, 135
-  #sw     $v0, ANGLE
-  #sw     $0, ANGLE_CONTROL             # Turn 135 degrees
-
-  jal    turn_to_target
+  jal    turn_to_target                # Face current target (away from wall)
 
   li     $v0, 10
   sw     $v0, VELOCITY                 # SET_VELOCITY(10)
 
-  j      interrupt_dispatch
+  j      interrupt_dispatch            # Handle remaining interrupts
 
 interrupt_coords:
   sw     $0, COORDS_ACKNOWLEDGE        # Acknowledge coords interrupt
 
-  sw     $0, COORDS_REQUEST            # REQUEST_COORD()
+  sw     $0, COORDS_REQUEST            # REQUEST_ENEMY_COORDS()
 
   lw     $a0, OTHER_BOT_X              # Get OTHER_BOT_X
   bltz   $a0, interrupt_dispatch       # Halt if other bot is invisible
@@ -215,71 +211,61 @@ interrupt_coords:
 
   sw     $a0, other_x                  # Store OTHER_BOT_X
   sw     $a1, other_y                  # Store OTHER_BOT_Y
-  j      interrupt_dispatch
+
+  j      interrupt_dispatch            # Handle remaining interrupts
 
 interrupt_timer:
   sw     $0, TIMER_ACKNOWLEDGE         # Acknowledge timer interrupt
 
   lw     $a0, FLAGS_IN_HAND
-  sw     $0, PICK_FLAG
+  sw     $0, PICK_FLAG                 # Attempt to pick up flag (no penalty)
   lw     $a1, FLAGS_IN_HAND
-  beq    $a1, $a0, it_skip_target
+  beq    $a1, $a0, it_skip_target      # Find new target if flag was picked
 
-  bge    $a1, HAND_THRESHOLD, it_target_base
-  #sw     $a1, PRINT_INT
+  bge    $a1, HAND_THRESHOLD, it_target_base # Return to base if enough flags
 
-  la     $a0, flags
-  sw     $a0, FLAG_REQUEST
-  lw     $a0, flags($0)
-  sw     $a0, target_x
-  lw     $a1, flags+4($0)
-  sw     $a1, target_y
-  jal    turn_to_target
+  jal    select_target                 # select_target
+  jal    turn_to_target                # Turn to target
+
   j      it_skip_target
 
 it_target_base:
+  sw     $0, GENERATE_FLAG
+  sw     $0, GENERATE_FLAG
+  sw     $0, GENERATE_FLAG
+  sw     $0, GENERATE_FLAG
+  sw     $0, GENERATE_FLAG             # Generate five flags
+
   add    $a0, $0, 150
-  sw     $a0, target_y
-  add    $a0, $0, 10
-  sw     $a0, target_x
-  jal    turn_to_target
+  sw     $a0, target_y                 # target_y = 150 (middle axis)
+  add    $a0, $0, 12
+  sw     $a0, target_x                 # target_x = 12 (in base)
+  jal    turn_to_target                # Turn to target
 
 it_skip_target:
   lw     $a0, SCORE                    # Get our score
   lw     $a1, ENEMY_SCORE              # Get enemy score
 
   sub    $v0, $a0, WIN_THRESHOLD
-  blt    $v0, $a1, it_enable_off
+  ble    $v0, $a1, it_enable_off       # Enable offense if margin is small
 
   lw     $a0, defense_mode
-  bgtz   $a0, it_skip_defense
+  bgtz   $a0, it_skip_defense          # Skip if already in defense mode
 
   add    $v0, $0, 1
   sw     $v0, defense_mode             # Enable defense mode
-  add    $t0, $t0, 69
-  sw     $t0, PRINT_INT
 
-  add    $v0, $0, 148
-  sw     $v0, target_x                 # target_x = 148
-  lw     $v0, other_y
-  sw     $v0, target_y                 # target_y = other_y
-  jal    turn_to_target
+  jal    select_target                 # Target defense position
+  jal    turn_to_target                # Turn to target
+
   j      it_skip_defense
 
 it_enable_off:
   lw     $a0, defense_mode
-  beqz   $a0, it_skip_defense
+  beqz   $a0, it_skip_defense          # Skip if already in offense mode
 
-  sw     $0, defense_mode
-
-  la     $a0, flags
-  sw     $a0, FLAG_REQUEST
-  lw     $a0, flags($0)
-  sw     $a0, target_x
-  lw     $a1, flags+4($0)
-  sw     $a1, target_y
-
-  jal    turn_to_target
+  jal    select_target                 # Target next flag
+  jal    turn_to_target                # Turn to target
 
 it_skip_defense:
   lw     $a0, BOT_X
@@ -289,9 +275,8 @@ it_skip_defense:
   bge    $a0, BE_B, it_skip_base       # Skip if below base
   ble    $a0, BE_T, it_skip_base       # Skip if above base
 
-  li     $a0, 180
-  sw     $a0, ANGLE
-  sw     $0, ANGLE_CONTROL             # Turn around
+  jal    select_target                 # Target next flag
+  jal    turn_to_target                # Turn to target
 
 it_skip_base:
   lw     $a0, TIMER
@@ -321,42 +306,55 @@ id_done:
 # Helper Functions #
 ####################
 
+select_target:
+  lw     $t0, defense_mode
+  beqz   $t0, st_offense
 
-### int angle_to_target();
-### Returns the angle to (target_x, target_y)
-#angle_to_target:
-#  bge    $a1, $a0, ca_rd               # !(my_loc < target)
-#  li     $v0, 0x8000                   # desired_angle = 0
-#  j      ca_return
-#
-#att_rd:
-#  li     $v0, 180                      # desired_angle = 180
-#
-#att_return:
-#  mul    $t0, $a2, 90                  # is_y * 90
-#  add    $v0, $v0, $t0                 # desired_angle + is_y * 90
-#  jr     $ra
+  lw     $t0, other_y
+  sw     $t0, target_y                 # target_y = other_y
+
+  add    $t0, $0, 148
+  sw     $t0, target_x                 # target_x = 148 (left of half)
+
+  add    $v0, $0, 1
+  jr     $ra                           # Return true (defense mode)
+
+st_offense:
+  la     $a0, flags
+  sw     $a0, FLAG_REQUEST
+  lw     $a0, flags($0)
+  sw     $a0, target_x                 # target_x = flags[0].x
+  lw     $a1, flags+4($0)
+  sw     $a1, target_y                 # target_y = flags[0].y
+
+  move   $v0, $0
+  jr     $ra                           # Return false (offense mode)
+
 
 turn_to_target:
   la     $k0, chunkIH
   sw     $ra, 20($k0)
 
   lw     $t0, target_x
-  lw     $t1, other_x
-  sub    $a0, $t1, $t0
+  lw     $t1, BOT_X
+  sub    $a0, $t1, $t0                 # x = other_x - target_x
 
   lw     $t0, target_y
-  lw     $t1, other_y
-  sub    $a1, $t1, $t0
+  lw     $t1, BOT_Y
+  sub    $a1, $t1, $t0                 # y = other_y - target_y
 
-  jal    sb_arctan
+  jal    sb_arctan                     # sb_arctan(x, y)
 
   sw     $v0, PRINT_INT
+  lw     $t0, target_x
+  lw     $t1, target_y
+  sw     $t0, PRINT_INT
+  sw     $t1, PRINT_INT
   add    $v0, $v0, 180
 
-  add    $a0, $0, 0
+  add    $t0, $0, 1
   sw     $v0, ANGLE
-  sw     $a0, ANGLE_CONTROL
+  sw     $t0, ANGLE_CONTROL            # SET_ANGLE_ABSOLUTE(arctan)
 
   lw     $ra, 20($k0)
   jr     $ra
