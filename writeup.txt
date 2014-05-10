@@ -1,0 +1,37 @@
+[Enter Team Name Here]
+======================
+
+  "The distance between insanity and genius is measured only by success."
+-Bruce Feirstein
+
+  Our spimbot implements a dual-mode offensive and defensive strategy.
+Initially, the spimbot is in offensive attack mode. The spimbot targets the
+first flag in the array, as it was determined that finding the closest flag
+wasn't worth the cycles. The flags are similiar enough in distance that this
+works out just fine.
+
+  After collecting a certain number of flags (less than the maximum number per
+hand), the spimbot returns to base and drops off the flags. At this point, if
+our score is greater than 12 (to obtain the 60 base points) and a certain
+number of points higher than the opponent's score, we'll enter defense mode.
+Otherwise, stay in offense mode and continue to rack up points. If the other
+spimbot is really good, we might not ever enter defense mode.
+
+  In defense mode, we stay on the x=148 line and move up and down to match the
+enemy's y coordinate. This way, as long as the enemy isn't invisible, we should
+be able to keep it from entering or exiting our side of the field without
+getting tagged. If at any point during the defense mode the enemy's score gets
+back within the threshold of our score, we'll exit defense mode and go back
+into offensive attack mode.
+
+  Besides the two modes, there are several other features and optimizations.
+Fist, it was determined that adding a rule2 suduko solver wasn't worth the
+cycles, as rule1 can solve almost all of the puzzles. Adding rule2 just
+decreased the total number of sudoku puzzles solved. Secondly, the entire
+rule1 sudoku solver was optimized by counting some loops backwards towards
+zero, utilizting fewer expensive psuedoinstructions, and decreasing the total
+instruction count. Invisibility also plays an important role in our spimbot's
+quest for domination. Invisibility is enabled if we are on the enemy's side of
+the field, have the energy to do so, and are within a certain distance of the
+enemy spimbot. This way, it makes it very difficult for the enemy spimbot to
+tag us, unless our spimbot doesn't have the energy required to go invisible.

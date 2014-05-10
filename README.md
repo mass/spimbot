@@ -2,7 +2,7 @@
 > The distance between insanity and genius is measured only by success. -Bruce Feirstein
 
 ## Strategy
-[Enter strategy here]
+See `writeup.txt` for stategy details.
 
 ## Code Style
 
