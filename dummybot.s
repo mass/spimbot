@@ -1,14 +1,12 @@
 #########################
-# File: spimbot.s       #
+# File: dummybot.s      #
 #                       #
 # Author: Andrew Mass   #
 # Date:   2014-05-10    #
 #                       #
-# "The distance between #
-# insanity and genius   #
-# is measured only by   #
-# success."             #
-# -Bruce Feirstein      #
+# This bot is used as   #
+# a punching bag for my #
+# actual spimbot.       #
 #########################
 
 ########################
@@ -19,7 +17,7 @@
 
 # Spimbot constants
 NUM_FLAGS          = 40                # Maximum flags on the board
-BASE_RADIUS        = 24                # Base radius
+BASE_RADIUS        = 12                # Base radius
 MAX_FLAGS          = 5                 # Maximum flags in hand
 FLAG_COST          = 7                 # Energy cost to generate a flag
 INVIS_COST         = 25                # Energy cost to go invisible
@@ -73,11 +71,12 @@ SYS_PRINT_CHAR     = 11
 TIMER_FREQ         = 1000
 
 # THRESHOLDS
-DEF_THRESHOLD      = 6
-HAND_THRESHOLD     = 4
-INVIS_THRESHOLD    = 40
-INVIS_DIST         = 10
-FLAGGEN_ENERGY     = 75
+DEF_THRESHOLD      = 5
+HAND_THRESHOLD     = 3
+SCORE_THRESHOLD    = 12
+INVIS_THRESHOLD    = 50
+INVIS_DIST         = 20
+FLAGGEN_SCORE      = 100
 
 # Float constants
 three:             .float 3.0
@@ -86,12 +85,8 @@ pi:                .float 3.14159265
 f180:              .float 180.0
 
 # Data member storage
-defense_mode:      .word 0             # Initially in offense mode
-invis_ready:       .word 0             # Initially not ready
 target_x:          .word 148
 target_y:          .word 150           # Initially targeted at the center
-other_x:           .word -1
-other_y:           .word -1            # Initally unknown
 
 # Sudoku board memory
 sudoku:            .space 512
@@ -105,17 +100,12 @@ flags:             .space NUM_FLAGS * 2 * 4
 
 main:
   li     $t0, BONK_MASK
-  or     $t0, $t0, COORDS_MASK
-  or     $t0, $t0, INVIS_MASK
-  or     $t0, $t0, TAG_MASK
   or     $t0, $t0, TIMER_MASK
   or     $t0, $t0, 1
-  mtc0   $t0, $12                      # Enable all interrupts
+  mtc0   $t0, $12                      # Enable interrupts
 
   li     $t0, 10
   sw     $t0, VELOCITY                 # SET_VELCOITY(10)
-
-  sw     $0, COORDS_REQUEST            # REQUEST_ENEMY_COORDS()
 
   lw     $t0, TIMER
   add    $t0, $t0, TIMER_FREQ
@@ -185,15 +175,6 @@ interrupt_dispatch:
   and    $a0, $k0, BONK_MASK
   bnez   $a0, interrupt_bonk           # Handle bonk interrupt
 
-  and    $a0, $k0, COORDS_MASK
-  bnez   $a0, interrupt_coords         # Handle coords interrupt
-
-  and    $a0, $k0, INVIS_MASK
-  bnez   $a0, interrupt_invis          # Handle invisibility interrupt
-
-  and    $a0, $k0, TAG_MASK
-  bnez   $a0, interrupt_tag            # Handle tag interrupt
-
   and    $a0, $k0, TIMER_MASK
   bnez   $a0, interrupt_timer          # Handle timer interrupt
 
@@ -213,35 +194,6 @@ interrupt_bonk:
 
   j      interrupt_dispatch            # Handle remaining interrupts
 
-interrupt_coords:
-  sw     $0, COORDS_ACKNOWLEDGE        # Acknowledge coords interrupt
-
-  sw     $0, COORDS_REQUEST            # REQUEST_ENEMY_COORDS()
-
-  lw     $a0, OTHER_BOT_X              # Get OTHER_BOT_X
-  bltz   $a0, interrupt_dispatch       # Halt if other bot is invisible
-  lw     $a1, OTHER_BOT_Y              # Get OTHER_BOT_Y
-
-  sw     $a0, other_x                  # Store OTHER_BOT_X
-  sw     $a1, other_y                  # Store OTHER_BOT_Y
-
-  j      interrupt_dispatch            # Handle remaining interrupts
-
-interrupt_invis:
-  sw     $0, INVIS_ACKNOWLEDGE         # Acknowledge invisibility interrupt
-
-  add    $a0, $0, 1
-  sw     $a0, invis_ready              # Set invis_ready = true
-
-  j      interrupt_dispatch            # Handle remaining interrupts
-
-interrupt_tag:
-  sw     $0, TAG_ACKNOWLEDGE           # Acknowledge tag interrupt
-
-  jal    turn_to_target
-
-  j      interrupt_dispatch            # Handle remaining interrupts
-
 interrupt_timer:
   sw     $0, TIMER_ACKNOWLEDGE         # Acknowledge timer interrupt
 
@@ -257,60 +209,6 @@ interrupt_timer:
   jal    turn_to_target
 
 it_skip_target:
-  lw     $t0, defense_mode
-  beqz   $t0, it_skip_defense
-
-  lw     $t0, BOT_X
-  bne    $t0, 148, it_skip_defense_nav
-
-  lw     $t0, other_y
-  lw     $t1, BOT_Y
-  blt    $t1, $t0, it_defense_down
-
-  add    $a0, $0, 270
-  sw     $a0, ANGLE
-
-  add    $a0, $0, 1
-  sw     $a0, ANGLE_CONTROL
-  j      it_skip_nav
-
-it_defense_down:
-  add    $a0, $0, 90
-  sw     $a0, ANGLE
-
-  add    $a0, $0, 1
-  sw     $a0, ANGLE_CONTROL
-  j      it_skip_nav
-
-it_skip_defense_nav:
-  jal    select_target                 # select_target
-  jal    turn_to_target                # Turn to target
-
-  j      it_skip_nav
-
-it_target_base:
-  sw     $0, GENERATE_FLAG
-  sw     $0, GENERATE_FLAG
-  sw     $0, GENERATE_FLAG
-  sw     $0, GENERATE_FLAG             # Generate flags
-
-  lw     $t0, ENERGY
-  blt    $t0, FLAGGEN_ENERGY, it_skip_extra
-
-  sw     $0, GENERATE_FLAG
-  sw     $0, GENERATE_FLAG
-  sw     $0, GENERATE_FLAG
-  sw     $0, GENERATE_FLAG             # Generate flags
-
-it_skip_extra:
-  add    $a0, $0, 150
-  sw     $a0, target_y                 # target_y = 150 (middle axis)
-  add    $a0, $0, 12
-  sw     $a0, target_x                 # target_x = 12 (in base)
-  jal    turn_to_target                # Turn to target
-  j      it_skip_nav
-
-it_skip_defense:
   lw     $a0, BOT_X
   bge    $a0, BASE_RADIUS, it_skip_nav # Skip if right of base
 
@@ -321,23 +219,30 @@ it_skip_defense:
   jal    select_target                 # Target next flag
   jal    turn_to_target                # Turn to target
 
+  j      it_skip_nav
+
+it_target_base:
+  sw     $0, GENERATE_FLAG
+  sw     $0, GENERATE_FLAG
+  sw     $0, GENERATE_FLAG             # Generate flags
+
+  lw     $t0, SCORE
+  blt    $t0, FLAGGEN_SCORE, it_skip_extra
+
+  sw     $0, GENERATE_FLAG
+  sw     $0, GENERATE_FLAG
+  sw     $0, GENERATE_FLAG             # Generate flags
+
+it_skip_extra:
+  add    $a0, $0, 150
+  sw     $a0, target_y                 # target_y = 150 (middle axis)
+  add    $a0, $0, 12
+  sw     $a0, target_x                 # target_x = 12 (in base)
+  jal    turn_to_target                # Turn to target
+
 it_skip_nav:
   lw     $a0, SCORE                    # Get our score
   lw     $a1, ENEMY_SCORE              # Get enemy score
-
-  add    $v0, $a1, DEF_THRESHOLD
-  ble    $a0, $v0, it_enable_off       # Offense if score is below threshold
-  ble    $a0, 12, it_enable_off        # Offense if less than 12 score
-  jal    enable_defense                # Otherwise, defense mode
-  j      it_invis
-
-it_enable_off:
-  jal    enable_offense                # Enable offense if margin is small
-
-it_invis:
-  lw     $a0, invis_ready
-  beqz   $a0, it_finis
-  jal    check_set_invis               # Turn invisible if able and willing
 
 it_finis:
   lw     $a0, TIMER
@@ -368,98 +273,17 @@ id_done:
 # Helper Functions #
 ####################
 
-### void check_set_invis()
-### Enables invisibility if there is good reason to do so
-check_set_invis:
-  lw     $a0, defense_mode
-  bnez   $a0, csi_return
-
-  lw     $a0, ENERGY
-  blt    $a0, INVIS_THRESHOLD, csi_return
-
-  lw     $a0, BOT_X
-  blt    $a0, 150, csi_return
-
-  lw     $a1, OTHER_BOT_X
-  sub    $a0, $a0, $a1
-  abs    $a0, $a0
-  bgt    $a0, INVIS_DIST, csi_return
-
-  lw     $a0, BOT_Y
-  lw     $a1, OTHER_BOT_Y
-  sub    $a0, $a0, $a1
-  abs    $a0, $a0
-  bgt    $a0, INVIS_DIST, csi_return
-
-  sw     $0, ACTIVATE_INVIS
-  sw     $0, invis_ready
-
-csi_return:
-  jr     $ra
-
-### void enable_offense()
-### Changes to offense mode if not already in offense mode
-enable_offense:
-  sub    $sp, $sp, 4                   # Allocate stack memory
-  sw     $ra, 0($sp)                   # Save $ra
-
-  lw     $t0, defense_mode
-  beqz   $t0, eo_return                # Return if already in offense mode
-
-  sw     $0, defense_mode              # Enable offense mode
-  jal    select_target
-  jal    turn_to_target                # Turn towards next target
-
-eo_return:
-  lw     $ra, 0($sp)                   # Restore $ra
-  add    $sp, $sp, 4                   # Deallocate stack memory
-  jr     $ra                           # Return
-
-### void enable_defense()
-### Changes to defense mode if not already in defense mode
-enable_defense:
-  sub    $sp, $sp, 4
-  sw     $ra, 0($sp)
-  lw     $a0, defense_mode
-  bgtz   $a0, ed_return                # Skip if already in defense mode
-
-  add    $v0, $0, 1
-  sw     $v0, defense_mode             # Enable defense mode
-
-  jal    select_target                 # Target defense position
-  jal    turn_to_target                # Turn to target
-
-ed_return:
-  lw     $ra, 0($sp)
-  add    $sp, $sp, 4
-  jr     $ra
-
 ### bool select_target()
 ### Updates the target_x and target_y variables with correct values
 ### Returns true if defense target and false if offense target
 select_target:
-  lw     $t0, defense_mode
-  beqz   $t0, st_offense
-
-  lw     $t0, other_y
-  sw     $t0, target_y                 # target_y = other_y
-
-  add    $t0, $0, 148
-  sw     $t0, target_x                 # target_x = 148 (left of half)
-
-  add    $v0, $0, 1
-  jr     $ra                           # Return true (defense mode)
-
-st_offense:
   la     $a0, flags
   sw     $a0, FLAG_REQUEST
   lw     $a0, flags($0)
   bltz   $a0, st_no_flags              # Branch if flags[0].x < 0
-  lw     $a1, flags+4($0)
-
   sw     $a0, target_x                 # target_x = flags[0].x
+  lw     $a1, flags+4($0)
   sw     $a1, target_y                 # target_y = flags[0].y
-
   j      st_return_false
 
 st_no_flags:
@@ -467,12 +291,6 @@ st_no_flags:
   li     $a1, 150
   sw     $a0, target_x                 # target_x = 12;
   sw     $a1, target_y                 # target_y = 150;
-
-  sw     $0, GENERATE_FLAG
-  sw     $0, GENERATE_FLAG
-  sw     $0, GENERATE_FLAG
-  sw     $0, GENERATE_FLAG
-  sw     $0, GENERATE_FLAG             # Generate some flags
 
 st_return_false:
   move   $v0, $0
@@ -499,19 +317,6 @@ turn_to_target:
   sw     $t0, ANGLE_CONTROL            # SET_ANGLE_ABSOLUTE(arctan)
 
   lw     $ra, 20($k0)
-  jr     $ra
-
-### int euclidean_dist(int x, int y);
-### Returns sqrt(x^2 + y^2)
-euclidean_dist:
-  mul    $a0, $a0, $a0                 # x^2
-  mul    $a1, $a1, $a1                 # y^2
-  add    $v0, $a0, $a1                 # x^2 + y^2
-  mtc1   $v0, $f0
-  cvt.s.w $f0, $f0                     # float(x^2 + y^2)
-  sqrt.s $f0, $f0                      # sqrt(x^2 + y^2)
-  cvt.w.s $f0, $f0                     # int(sqrt(...))
-  mfc1   $v0, $f0
   jr     $ra
 
 ### int arctan(int x, int y);
