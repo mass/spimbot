@@ -1,4 +1,7 @@
 #########################
+# Karel J. Spimbot      #
+# ================      #
+#                       #
 # File: spimbot.s       #
 #                       #
 # Author: Andrew Mass   #
