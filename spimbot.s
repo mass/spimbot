@@ -2,7 +2,7 @@
 # File: spimbot.s       #
 #                       #
 # Author: Andrew Mass   #
-# Date:   2014-05-08    #
+# Date:   2014-05-10    #
 #                       #
 # "The distance between #
 # insanity and genius   #
@@ -73,10 +73,12 @@ SYS_PRINT_CHAR     = 11
 TIMER_FREQ         = 1000
 
 # THRESHOLDS
-DEF_THRESHOLD      = 3
+DEF_THRESHOLD      = 5
 HAND_THRESHOLD     = 3
-SCORE_THRESHOLD   = 11
-INVIS_THRESHOLD	   = 6
+SCORE_THRESHOLD    = 12
+INVIS_THRESHOLD    = 50
+INVIS_DIST         = 20
+FLAGGEN_SCORE      = 100
 
 # Float constants
 three:             .float 3.0
@@ -85,11 +87,12 @@ pi:                .float 3.14159265
 f180:              .float 180.0
 
 # Data member storage
-defense_mode:      .word 0
+defense_mode:      .word 0             # Initially in offense mode
+invis_ready:       .word 0             # Initially not ready
 target_x:          .word 148
-target_y:          .word 150
+target_y:          .word 150           # Initially targeted at the center
 other_x:           .word -1
-other_y:           .word -1
+other_y:           .word -1            # Initally unknown
 
 # Sudoku board memory
 sudoku:            .space 512
@@ -102,12 +105,13 @@ flags:             .space NUM_FLAGS * 2 * 4
 .text
 
 main:
-  li     $t0, TIMER_MASK
-  or     $t0, $t0, BONK_MASK
+  li     $t0, BONK_MASK
   or     $t0, $t0, COORDS_MASK
   or     $t0, $t0, INVIS_MASK
+  or     $t0, $t0, TAG_MASK
+  or     $t0, $t0, TIMER_MASK
   or     $t0, $t0, 1
-  mtc0   $t0, $12                      # Enable interrupts
+  mtc0   $t0, $12                      # Enable all interrupts
 
   li     $t0, 10
   sw     $t0, VELOCITY                 # SET_VELCOITY(10)
@@ -133,11 +137,10 @@ main:
   add    $t0, $0, 1
   sw     $t0, ANGLE_CONTROL            # SET_ABSOLUTE_ANGLE(0)
 
-infinite: 
+infinite:
   la     $a0, sudoku
   jal    sudoku_r1                     # Run rule1 algorithm
   bnez   $v0, infinite                 # Repeat rule1 if changes were made
-                   
 
   la     $t0, sudoku
   sw     $t0, SUDOKU_SOLVED            # Report solved sudoku
@@ -169,7 +172,7 @@ interrupt_handler:
   sw     $t0, 8($k0)                   # Save $t0
   sw     $t1, 12($k0)                  # Save $t1
   sw     $v0, 16($k0)                  # Save $v0
-  sw     $ra, 24($k0)
+  sw     $ra, 24($k0)                  # Save $ra
 
   mfc0   $k0, $13                      # Get interrupt cause register
   srl    $a0, $k0, 2
@@ -186,11 +189,14 @@ interrupt_dispatch:
   and    $a0, $k0, COORDS_MASK
   bnez   $a0, interrupt_coords         # Handle coords interrupt
 
+  and    $a0, $k0, INVIS_MASK
+  bnez   $a0, interrupt_invis          # Handle invisibility interrupt
+
+  and    $a0, $k0, TAG_MASK
+  bnez   $a0, interrupt_tag            # Handle tag interrupt
+
   and    $a0, $k0, TIMER_MASK
   bnez   $a0, interrupt_timer          # Handle timer interrupt
-  
-  and    $a0, $k0, INVIS_MASK
-  bnez   $a0, interrupt_invis
 
   li     $v0, SYS_PRINT_STRING
   la     $a0, unhandled_str
@@ -223,17 +229,15 @@ interrupt_coords:
   j      interrupt_dispatch            # Handle remaining interrupts
 
 interrupt_invis:
-  sw     $0, INVIS_ACKNOWLEDGE        # Acknowledge coords interrupt
-	
-  lw     $t0, defense_mode            #make sure not in defense mode
-  bnez   $t0, interrupt_dispatch
-  
-  lw	 $t1, SCORE
-  
-  blt	 $t1, INVIS_THRESHOLD, interrupt_dispatch
-  
-  sw	 $0, ACTIVATE_INVIS
-  
+  sw     $0, INVIS_ACKNOWLEDGE         # Acknowledge invisibility interrupt
+
+  add    $a0, $0, 1
+  sw     $a0, invis_ready              # Set invis_ready = true
+
+  j      interrupt_dispatch            # Handle remaining interrupts
+
+interrupt_tag:
+  sw     $0, TAG_ACKNOWLEDGE           # Acknowledge tag interrupt
   j      interrupt_dispatch            # Handle remaining interrupts
 
 interrupt_timer:
@@ -285,10 +289,16 @@ it_skip_defense_nav:
 it_target_base:
   sw     $0, GENERATE_FLAG
   sw     $0, GENERATE_FLAG
-  sw     $0, GENERATE_FLAG
-  sw     $0, GENERATE_FLAG
-  sw     $0, GENERATE_FLAG             # Generate five flags
+  sw     $0, GENERATE_FLAG             # Generate flags
 
+  lw     $t0, SCORE
+  blt    $t0, FLAGGEN_SCORE, it_skip_extra
+
+  sw     $0, GENERATE_FLAG
+  sw     $0, GENERATE_FLAG
+  sw     $0, GENERATE_FLAG             # Generate flags
+
+it_skip_extra:
   add    $a0, $0, 150
   sw     $a0, target_y                 # target_y = 150 (middle axis)
   add    $a0, $0, 12
@@ -312,19 +322,20 @@ it_skip_nav:
   lw     $a1, ENEMY_SCORE              # Get enemy score
 
   add    $v0, $a1, DEF_THRESHOLD
-  bgt    $a0, $v0, check_score 
+  ble    $a0, $v0, it_enable_off       # Offense if score is below threshold
+  ble    $a0, SCORE_THRESHOLD, it_enable_off # Offense if less than 12 score
+  jal    enable_defense                # Otherwise, defense mode
+  j      it_invis
 
-else:
+it_enable_off:
   jal    enable_offense                # Enable offense if margin is small
-  j      it_finish
-  
-check_score:
-  blt    $a0, SCORE_THRESHOLD, else
 
-it_enable_def:
-  jal    enable_defense
+it_invis:
+  lw     $a0, invis_ready
+  beqz   $a0, it_finis
+  jal    check_set_invis               # Turn invisible if able and willing
 
-it_finish:
+it_finis:
   lw     $a0, TIMER
   add    $a0, $a0, TIMER_FREQ
   sw     $a0, TIMER                    # REQUEST_TIMER(TIMER() + TIMER_FREQ)
@@ -343,7 +354,7 @@ id_done:
   lw     $t0, 8($k0)                   # Restore $t0
   lw     $t1, 12($k0)                  # Restore $t1
   lw     $v0, 16($k0)                  # Restore $v0
-  lw     $ra, 24($k0)
+  lw     $ra, 24($k0)                  # Restore $ra
 .set noat
   move   $at, $k1                      # Restore $at
 .set at
@@ -353,23 +364,52 @@ id_done:
 # Helper Functions #
 ####################
 
+### void check_set_invis()
+### Enables invisibility if there is good reason to do so
+check_set_invis:
+  lw     $a0, defense_mode
+  bnez   $a0, csi_return
+
+  lw     $a0, ENERGY
+  blt    $a0, INVIS_THRESHOLD, csi_return
+
+  lw     $a0, BOT_X
+  blt    $a0, 150, csi_return
+
+  lw     $a1, OTHER_BOT_X
+  sub    $a0, $a0, $a1
+  abs    $a0, $a0
+  bgt    $a0, INVIS_DIST, csi_return
+
+  lw     $a0, BOT_Y
+  lw     $a1, OTHER_BOT_Y
+  sub    $a0, $a0, $a1
+  abs    $a0, $a0
+  bgt    $a0, INVIS_DIST, csi_return
+
+  sw     $0, ACTIVATE_INVIS
+  sw     $0, invis_ready
+
+csi_return:
+  jr     $ra
+
 ### void enable_offense()
 ### Changes to offense mode if not already in offense mode
 enable_offense:
-  sub    $sp, $sp, 4
-  sw     $ra, 0($sp)
-  lw     $t0, defense_mode
-  beqz   $t0, eo_return
+  sub    $sp, $sp, 4                   # Allocate stack memory
+  sw     $ra, 0($sp)                   # Save $ra
 
-  sw     $0, defense_mode
+  lw     $t0, defense_mode
+  beqz   $t0, eo_return                # Return if already in offense mode
+
+  sw     $0, defense_mode              # Enable offense mode
   jal    select_target
-  jal    turn_to_target
+  jal    turn_to_target                # Turn towards next target
 
 eo_return:
-  lw     $ra, 0($sp)
-  add    $sp, $sp, 4
-  jr     $ra
-
+  lw     $ra, 0($sp)                   # Restore $ra
+  add    $sp, $sp, 4                   # Deallocate stack memory
+  jr     $ra                           # Return
 
 ### void enable_defense()
 ### Changes to defense mode if not already in defense mode
@@ -395,7 +435,7 @@ ed_return:
 ### Returns true if defense target and false if offense target
 select_target:
   lw     $t0, defense_mode
-  beqz   $t0, st_offense   
+  beqz   $t0, st_offense
 
   lw     $t0, other_y
   sw     $t0, target_y                 # target_y = other_y
@@ -425,7 +465,6 @@ st_no_flags:
 st_return_false:
   move   $v0, $0
   jr     $ra                           # Return false (offense mode)
-
 
 ### void turn_to_target
 ### Turns the spimbot to face the target
@@ -650,7 +689,7 @@ s_r1_oloop_e:
   lw     $s0, 0($sp)                   # Restore $s0
   lw     $s1, 4($sp)                   # Restore $s1
   lw     $s2, 8($sp)                   # Restore $s2
-   lw     $s3, 12($sp)                  # Restore $s3
+  lw     $s3, 12($sp)                  # Restore $s3
   lw     $s4, 16($sp)                  # Restore $s4
   lw     $ra, 20($sp)                  # Restore $ra
   add    $sp, $sp, 24                  # Deallocate stack memory
