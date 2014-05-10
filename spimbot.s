@@ -70,11 +70,13 @@ SYS_PRINT_STRING   = 4
 SYS_PRINT_CHAR     = 11
 
 # Frequency constants
-TIMER_FREQ         = 2000
+TIMER_FREQ         = 1000
 
 # THRESHOLDS
 DEF_THRESHOLD      = 3
 HAND_THRESHOLD     = 3
+SCORE_THRESHOLD   = 11
+INVIS_THRESHOLD	   = 6
 
 # Float constants
 three:             .float 3.0
@@ -103,6 +105,7 @@ main:
   li     $t0, TIMER_MASK
   or     $t0, $t0, BONK_MASK
   or     $t0, $t0, COORDS_MASK
+  or     $t0, $t0, INVIS_MASK
   or     $t0, $t0, 1
   mtc0   $t0, $12                      # Enable interrupts
 
@@ -130,10 +133,11 @@ main:
   add    $t0, $0, 1
   sw     $t0, ANGLE_CONTROL            # SET_ABSOLUTE_ANGLE(0)
 
-infinite:
+infinite: 
   la     $a0, sudoku
   jal    sudoku_r1                     # Run rule1 algorithm
   bnez   $v0, infinite                 # Repeat rule1 if changes were made
+                   
 
   la     $t0, sudoku
   sw     $t0, SUDOKU_SOLVED            # Report solved sudoku
@@ -149,7 +153,7 @@ infinite:
 
 .kdata
 
-chunkIH:           .space    24
+chunkIH:           .space    28
 non_intrpt_str:    .asciiz   "Non-interrupt exception\n"
 unhandled_str:     .asciiz   "Unhandled interrupt type\n"
 
@@ -165,6 +169,7 @@ interrupt_handler:
   sw     $t0, 8($k0)                   # Save $t0
   sw     $t1, 12($k0)                  # Save $t1
   sw     $v0, 16($k0)                  # Save $v0
+  sw     $ra, 24($k0)
 
   mfc0   $k0, $13                      # Get interrupt cause register
   srl    $a0, $k0, 2
@@ -183,6 +188,9 @@ interrupt_dispatch:
 
   and    $a0, $k0, TIMER_MASK
   bnez   $a0, interrupt_timer          # Handle timer interrupt
+  
+  and    $a0, $k0, INVIS_MASK
+  bnez   $a0, interrupt_invis
 
   li     $v0, SYS_PRINT_STRING
   la     $a0, unhandled_str
@@ -212,6 +220,20 @@ interrupt_coords:
   sw     $a0, other_x                  # Store OTHER_BOT_X
   sw     $a1, other_y                  # Store OTHER_BOT_Y
 
+  j      interrupt_dispatch            # Handle remaining interrupts
+
+interrupt_invis:
+  sw     $0, INVIS_ACKNOWLEDGE        # Acknowledge coords interrupt
+	
+  lw     $t0, defense_mode            #make sure not in defense mode
+  bnez   $t0, interrupt_dispatch
+  
+  lw	 $t1, SCORE
+  
+  blt	 $t1, INVIS_THRESHOLD, interrupt_dispatch
+  
+  sw	 $0, ACTIVATE_INVIS
+  
   j      interrupt_dispatch            # Handle remaining interrupts
 
 interrupt_timer:
@@ -290,10 +312,14 @@ it_skip_nav:
   lw     $a1, ENEMY_SCORE              # Get enemy score
 
   add    $v0, $a1, DEF_THRESHOLD
-  bgt    $a0, $v0, it_enable_def
+  bgt    $a0, $v0, check_score 
 
+else:
   jal    enable_offense                # Enable offense if margin is small
   j      it_finish
+  
+check_score:
+  blt    $a0, SCORE_THRESHOLD, else
 
 it_enable_def:
   jal    enable_defense
@@ -317,6 +343,7 @@ id_done:
   lw     $t0, 8($k0)                   # Restore $t0
   lw     $t1, 12($k0)                  # Restore $t1
   lw     $v0, 16($k0)                  # Restore $v0
+  lw     $ra, 24($k0)
 .set noat
   move   $at, $k1                      # Restore $at
 .set at
@@ -329,6 +356,8 @@ id_done:
 ### void enable_offense()
 ### Changes to offense mode if not already in offense mode
 enable_offense:
+  sub    $sp, $sp, 4
+  sw     $ra, 0($sp)
   lw     $t0, defense_mode
   beqz   $t0, eo_return
 
@@ -337,6 +366,8 @@ enable_offense:
   jal    turn_to_target
 
 eo_return:
+  lw     $ra, 0($sp)
+  add    $sp, $sp, 4
   jr     $ra
 
 
@@ -364,7 +395,7 @@ ed_return:
 ### Returns true if defense target and false if offense target
 select_target:
   lw     $t0, defense_mode
-  beqz   $t0, st_offense
+  beqz   $t0, st_offense   
 
   lw     $t0, other_y
   sw     $t0, target_y                 # target_y = other_y
@@ -619,7 +650,7 @@ s_r1_oloop_e:
   lw     $s0, 0($sp)                   # Restore $s0
   lw     $s1, 4($sp)                   # Restore $s1
   lw     $s2, 8($sp)                   # Restore $s2
-  lw     $s3, 12($sp)                  # Restore $s3
+   lw     $s3, 12($sp)                  # Restore $s3
   lw     $s4, 16($sp)                  # Restore $s4
   lw     $ra, 20($sp)                  # Restore $ra
   add    $sp, $sp, 24                  # Deallocate stack memory
