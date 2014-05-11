@@ -1,4 +1,4 @@
-# spimbot
+# Karel J. Spimbot
 > The distance between insanity and genius is measured only by success. -Bruce Feirstein
 
 ## Strategy
